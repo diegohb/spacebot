@@ -2,7 +2,7 @@
 
 use crate::conversation::ConversationLogger;
 
-use crate::{ChannelId, OutboundResponse};
+use crate::{ChannelId, OutboundResponse, RoutedSender};
 use regex::Regex;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
@@ -12,7 +12,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::LazyLock;
 use std::sync::atomic::{AtomicBool, Ordering};
-use tokio::sync::mpsc;
 
 static BROKEN_DISCORD_MENTION_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"<{2,}@(!?)>\s*(\d{15,22})>").expect("hardcoded broken mention regex")
@@ -40,7 +39,7 @@ pub fn new_replied_flag() -> RepliedFlag {
 /// tools once and shares them across calls.
 #[derive(Debug, Clone)]
 pub struct ReplyTool {
-    response_tx: mpsc::Sender<OutboundResponse>,
+    response_tx: RoutedSender,
     conversation_id: String,
     conversation_logger: ConversationLogger,
     channel_id: ChannelId,
@@ -51,7 +50,7 @@ pub struct ReplyTool {
 impl ReplyTool {
     /// Create a new reply tool bound to a conversation's response channel.
     pub fn new(
-        response_tx: mpsc::Sender<OutboundResponse>,
+        response_tx: RoutedSender,
         conversation_id: impl Into<String>,
         conversation_logger: ConversationLogger,
         channel_id: ChannelId,
