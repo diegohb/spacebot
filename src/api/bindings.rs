@@ -118,6 +118,8 @@ pub(super) struct DeleteBindingRequest {
     workspace_id: Option<String>,
     #[serde(default)]
     chat_id: Option<String>,
+    #[serde(default)]
+    team_id: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -441,8 +443,8 @@ pub(super) async fn create_binding(
     if let Some(chat_id) = &request.chat_id {
         binding_table["chat_id"] = toml_edit::value(chat_id.as_str());
     }
-    if let Some(team_id) = &request.team_id {
-        binding_table["team_id"] = toml_edit::value(team_id.as_str());
+    if let Some(team_id) = request.team_id.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        binding_table["team_id"] = toml_edit::value(team_id);
     }
     if !request.channel_ids.is_empty() {
         let mut arr = toml_edit::Array::new();
@@ -939,12 +941,20 @@ pub(super) async fn delete_binding(
                 .is_some_and(|v| v == cid),
             None => table.get("chat_id").is_none(),
         };
+        let matches_team = match &request.team_id {
+            Some(tid) => table
+                .get("team_id")
+                .and_then(|v: &toml_edit::Item| v.as_str())
+                .is_some_and(|v| v == tid),
+            None => table.get("team_id").is_none(),
+        };
         if matches_agent
             && matches_channel
             && matches_adapter
             && matches_guild
             && matches_workspace
             && matches_chat
+            && matches_team
         {
             match_idx = Some(i);
             break;

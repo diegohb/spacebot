@@ -545,7 +545,7 @@ impl Messaging for MattermostAdapter {
                                                                 &post.channel_id,
                                                             ).await;
 
-                                                            if let Some(msg) = build_message_from_post(
+                                                            if let Some(mut msg) = build_message_from_post(
                                                                 &post,
                                                                 &runtime_key,
                                                                 &bot_user_id,
@@ -555,6 +555,24 @@ impl Messaging for MattermostAdapter {
                                                                 display_name.as_deref(),
                                                                 channel_name.as_deref(),
                                                             ) {
+                                                                // Detect thread replies to the bot:
+                                                                // if root_id is set, fetch the root post
+                                                                // and check if the bot authored it.
+                                                                if !post.root_id.is_empty() {
+                                                                    if let Some(root_author) = resolve_root_post_author(
+                                                                        &ws_client,
+                                                                        token.as_ref(),
+                                                                        &ws_base_url,
+                                                                        &post.root_id,
+                                                                    ).await {
+                                                                        if root_author == bot_user_id.as_ref() {
+                                                                            msg.metadata.insert(
+                                                                                "mattermost_mentions_or_replies_to_bot".into(),
+                                                                                serde_json::json!(true),
+                                                                            );
+                                                                        }
+                                                                    }
+                                                                }
                                                                 if inbound_tx_clone.send(msg).await.is_err() {
                                                                     tracing::debug!("inbound channel closed");
                                                                     return;
@@ -1174,9 +1192,12 @@ fn build_message_from_post(
         );
     }
 
-    // FN4: bot mention detection — check for @bot_username in message text
-    let mentions_bot = !bot_username.is_empty()
-        && post.message.contains(&format!("@{bot_username}"));
+    // FN4: bot mention detection — @mention, DM, or thread reply to bot post.
+    // Thread-reply-to-bot detection is handled asynchronously in the WS event
+    // handler and may upgrade this to true after this function returns.
+    let is_dm = post.channel_type.as_deref() == Some("D");
+    let mentions_bot = is_dm
+        || (!bot_username.is_empty() && post.message.contains(&format!("@{bot_username}")));
     metadata.insert(
         "mattermost_mentions_or_replies_to_bot".into(),
         serde_json::json!(mentions_bot),
@@ -1386,6 +1407,43 @@ async fn resolve_channel_name(
     Some(name)
 }
 
+/// Fetch the `user_id` of the author of a Mattermost post by its ID.
+///
+/// Used to detect thread replies to the bot: if a post's `root_id` resolves to
+/// a post authored by the bot, the reply should be treated as directed at the
+/// bot for `require_mention` purposes. Returns `None` on any network or API
+/// error (logged at `DEBUG` level).
+async fn resolve_root_post_author(
+    client: &Client,
+    token: &str,
+    base_url: &Url,
+    post_id: &str,
+) -> Option<String> {
+    let mut url = base_url.clone();
+    url.path_segments_mut()
+        .ok()?
+        .extend(["api", "v4", "posts", post_id]);
+    let resp = match client.get(url).bearer_auth(token).send().await {
+        Ok(r) => r,
+        Err(error) => {
+            tracing::debug!(%error, post_id, "failed to fetch mattermost root post");
+            return None;
+        }
+    };
+    if !resp.status().is_success() {
+        tracing::debug!(status = %resp.status(), post_id, "mattermost root post fetch returned non-success");
+        return None;
+    }
+    let post: MattermostPost = match resp.json().await {
+        Ok(p) => p,
+        Err(error) => {
+            tracing::debug!(%error, post_id, "failed to parse mattermost root post response");
+            return None;
+        }
+    };
+    Some(post.user_id)
+}
+
 /// Convert an emoji input to a Mattermost reaction short-code name.
 ///
 /// Handles three input forms:
@@ -1428,9 +1486,12 @@ fn split_message(text: &str, max_len: usize) -> Vec<String> {
 
         let search_end = remaining.floor_char_boundary(max_len);
         let search_region = &remaining[..search_end];
+        // Ignore a break point at position 0 to avoid pushing an empty chunk
+        // (e.g. when the region starts with a newline or space).
         let break_point = search_region
             .rfind('\n')
             .or_else(|| search_region.rfind(' '))
+            .filter(|&pos| pos > 0)
             .unwrap_or(search_end);
 
         let end = remaining.floor_char_boundary(break_point);
