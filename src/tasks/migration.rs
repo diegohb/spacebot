@@ -74,11 +74,12 @@ pub async fn migrate_legacy_tasks(
                 total_migrated += count;
             }
             Err(error) => {
-                tracing::warn!(
+                tracing::error!(
                     agent_id,
                     %error,
-                    "failed to migrate tasks for agent, skipping"
+                    "failed to migrate tasks for agent — migration incomplete"
                 );
+                return Err(error);
             }
         }
     }
@@ -261,9 +262,25 @@ fn enrich_metadata(mut metadata: Value, legacy_agent_id: &str, legacy_task_numbe
     metadata
 }
 
+/// Normalize a timestamp string to RFC 3339 format. Handles both
+/// `YYYY-MM-DDTHH:MM:SSZ` (already correct) and SQLite's default
+/// `YYYY-MM-DD HH:MM:SS` form.
+fn normalize_timestamp(value: &str) -> String {
+    // Already RFC 3339 — return as-is.
+    if value.contains('T') {
+        return value.to_string();
+    }
+    // Try parsing SQLite's `YYYY-MM-DD HH:MM:SS` form.
+    if let Ok(naive) = chrono::NaiveDateTime::parse_from_str(value, "%Y-%m-%d %H:%M:%S") {
+        return naive.and_utc().to_rfc3339();
+    }
+    // Unrecognized format — return as-is rather than silently dropping.
+    value.to_string()
+}
+
 fn read_timestamp(row: &sqlx::sqlite::SqliteRow, column: &str) -> String {
     if let Ok(value) = row.try_get::<String, _>(column) {
-        return value;
+        return normalize_timestamp(&value);
     }
     row.try_get::<chrono::NaiveDateTime, _>(column)
         .map(|v| v.and_utc().to_rfc3339())
@@ -274,7 +291,7 @@ fn read_optional_timestamp(row: &sqlx::sqlite::SqliteRow, column: &str) -> Optio
     if let Ok(Some(value)) = row.try_get::<Option<String>, _>(column)
         && !value.is_empty()
     {
-        return Some(value);
+        return Some(normalize_timestamp(&value));
     }
     row.try_get::<Option<chrono::NaiveDateTime>, _>(column)
         .ok()

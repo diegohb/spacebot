@@ -74,6 +74,9 @@ impl Db {
 /// a single `tasks` table shared across all agents with globally unique task
 /// numbers. This replaces per-agent task tables.
 pub async fn connect_global_tasks(data_dir: &Path) -> Result<SqlitePool> {
+    std::fs::create_dir_all(data_dir)
+        .with_context(|| format!("failed to create data directory: {}", data_dir.display()))?;
+
     let db_path = data_dir.join("tasks.db");
     let url = format!("sqlite:{}?mode=rwc", db_path.display());
 

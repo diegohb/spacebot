@@ -2410,8 +2410,9 @@ export const api = {
 		fetch(`${getApiBase()}/webchat/history?agent_id=${encodeURIComponent(agentId)}&session_id=${encodeURIComponent(sessionId)}&limit=${limit}`),
 
 	// Tasks API
-	listTasks: (params?: { owner_agent_id?: string; assigned_agent_id?: string; status?: TaskStatus; priority?: TaskPriority; created_by?: string; limit?: number }) => {
+	listTasks: (params?: { agent_id?: string; owner_agent_id?: string; assigned_agent_id?: string; status?: TaskStatus; priority?: TaskPriority; created_by?: string; limit?: number }) => {
 		const search = new URLSearchParams();
+		if (params?.agent_id) search.set("agent_id", params.agent_id);
 		if (params?.owner_agent_id) search.set("owner_agent_id", params.owner_agent_id);
 		if (params?.assigned_agent_id) search.set("assigned_agent_id", params.assigned_agent_id);
 		if (params?.status) search.set("status", params.status);

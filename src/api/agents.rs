@@ -400,12 +400,13 @@ pub(super) async fn trigger_warmup(
         let Some(sandbox) = sandboxes.get(agent_id).cloned() else {
             continue;
         };
-        let task_store = state
-            .task_store
-            .load()
-            .as_ref()
-            .clone()
-            .unwrap_or_else(|| Arc::new(crate::tasks::TaskStore::new(sqlite_pool.clone())));
+        let Some(task_store) = state.task_store.load().as_ref().clone() else {
+            tracing::warn!(
+                agent_id,
+                "global task store not initialized, skipping warmup"
+            );
+            continue;
+        };
 
         let llm_manager = llm_manager.clone();
         let force = request.force;
@@ -716,10 +717,12 @@ pub async fn create_agent_internal(
         embedding_table,
         embedding_model,
     ));
-    let task_store =
-        state.task_store.load().as_ref().clone().unwrap_or_else(|| {
-            std::sync::Arc::new(crate::tasks::TaskStore::new(db.sqlite.clone()))
-        });
+    let task_store = state
+        .task_store
+        .load()
+        .as_ref()
+        .clone()
+        .ok_or_else(|| "global task store not initialized".to_string())?;
 
     let (event_tx, memory_event_tx) = crate::create_process_event_buses();
     let arc_agent_id: crate::AgentId = std::sync::Arc::from(agent_id.as_str());

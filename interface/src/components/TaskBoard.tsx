@@ -223,13 +223,15 @@ export function TaskBoard({
     queryKey,
     queryFn: () =>
       api.listTasks({
-        assigned_agent_id: agentId,
-        limit: 200,
+        agent_id: agentId,
+        limit: TASK_LIMIT,
       }),
     refetchInterval: 15_000,
   });
 
+  const TASK_LIMIT = 200;
   const tasks = data?.tasks ?? [];
+  const truncated = tasks.length >= TASK_LIMIT;
 
   // Group tasks by status
   const tasksByStatus: Record<TaskStatus, TaskItem[]> = {
@@ -327,6 +329,11 @@ export function TaskBoard({
             <Badge variant="violet" size="sm">
               {tasksByStatus.in_progress.length} in progress
             </Badge>
+          )}
+          {truncated && (
+            <span className="text-tiny text-amber-400">
+              Showing first {TASK_LIMIT} tasks
+            </span>
           )}
         </div>
         {effectiveOwner && (
@@ -586,7 +593,7 @@ function CreateTaskDialog({
   const [status, setStatus] = useState<TaskStatus>("backlog");
 
   const handleSubmit = useCallback(() => {
-    if (!title.trim()) return;
+    if (!title.trim() || isPending) return;
     onCreate({
       owner_agent_id: ownerAgentId,
       title: title.trim(),
@@ -598,7 +605,7 @@ function CreateTaskDialog({
     setDescription("");
     setPriority("medium");
     setStatus("backlog");
-  }, [title, description, priority, status, ownerAgentId, onCreate]);
+  }, [title, description, priority, status, ownerAgentId, isPending, onCreate]);
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>

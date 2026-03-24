@@ -162,6 +162,9 @@ pub struct UpdateTaskInput {
 /// Filters for listing tasks from the global store.
 #[derive(Debug, Clone, Default)]
 pub struct TaskListFilter {
+    /// Convenience: matches tasks where `owner_agent_id` OR `assigned_agent_id`
+    /// equals this value. Mutually exclusive with the individual fields below.
+    pub agent_id: Option<String>,
     pub owner_agent_id: Option<String>,
     pub assigned_agent_id: Option<String>,
     pub status: Option<TaskStatus>,
@@ -196,11 +199,15 @@ impl TaskStore {
                 .await
                 .context("failed to open task create transaction")?;
 
-            let task_number: i64 =
-                sqlx::query_scalar("SELECT COALESCE(MAX(task_number), 0) + 1 FROM tasks")
-                    .fetch_one(&mut *tx)
-                    .await
-                    .context("failed to allocate next task number")?;
+            // Atomically allocate the next task number from the high-water-mark
+            // sequence. This avoids number reuse after hard deletes.
+            let task_number: i64 = sqlx::query_scalar(
+                "UPDATE task_number_seq SET next_number = next_number + 1 \
+                 WHERE id = 1 RETURNING next_number - 1",
+            )
+            .fetch_one(&mut *tx)
+            .await
+            .context("failed to allocate next task number")?;
 
             let task_id = uuid::Uuid::new_v4().to_string();
 
@@ -269,6 +276,9 @@ impl TaskStore {
         let mut query = String::from(SELECT_COLUMNS);
         query.push_str(" FROM tasks WHERE 1=1");
 
+        if filter.agent_id.is_some() {
+            query.push_str(" AND (owner_agent_id = ? OR assigned_agent_id = ?)");
+        }
         if filter.owner_agent_id.is_some() {
             query.push_str(" AND owner_agent_id = ?");
         }
@@ -287,6 +297,9 @@ impl TaskStore {
         query.push_str(" ORDER BY task_number DESC LIMIT ?");
 
         let mut sql = sqlx::query(&query);
+        if let Some(ref agent) = filter.agent_id {
+            sql = sql.bind(agent).bind(agent);
+        }
         if let Some(ref owner) = filter.owner_agent_id {
             sql = sql.bind(owner);
         }
@@ -361,21 +374,30 @@ impl TaskStore {
         let next_status = input.status.unwrap_or(current.status);
         let next_priority = input.priority.unwrap_or(current.priority);
         let next_metadata = merge_json_object(current.metadata, input.metadata);
-        let next_assigned = input.assigned_agent_id.unwrap_or(current.assigned_agent_id);
-        let next_worker_id = if let Some(worker_id) = input.worker_id {
+        let next_assigned = input
+            .assigned_agent_id
+            .unwrap_or(current.assigned_agent_id.clone());
+        let reassigned = next_assigned != current.assigned_agent_id;
+
+        // If the task is being reassigned to a different agent, clear the worker
+        // binding so the old worker cannot keep updating it.
+        let clear_worker = input.clear_worker_id || (reassigned && current.worker_id.is_some());
+        let next_worker_id = if clear_worker {
+            None
+        } else if let Some(worker_id) = input.worker_id {
             Some(worker_id)
         } else {
             current.worker_id
         };
 
         let approved_at = if current.approved_at.is_none() && next_status == TaskStatus::Ready {
-            Some("datetime('now')")
+            Some("SET")
         } else {
             None
         };
 
         let completed_at = if next_status == TaskStatus::Done {
-            Some("datetime('now')")
+            Some("SET")
         } else if current.completed_at.is_some() && next_status != TaskStatus::Done {
             Some("NULL")
         } else {
@@ -387,20 +409,23 @@ impl TaskStore {
              assigned_agent_id = ?, subtasks = ?, metadata = ?, ",
         );
 
-        if input.clear_worker_id {
+        if clear_worker {
             query.push_str("worker_id = NULL, ");
         } else {
             query.push_str("worker_id = ?, ");
         }
 
-        query.push_str("approved_by = COALESCE(?, approved_by), updated_at = datetime('now')");
+        query.push_str(
+            "approved_by = COALESCE(?, approved_by), \
+             updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')",
+        );
 
         if approved_at.is_some() {
-            query.push_str(", approved_at = datetime('now')");
+            query.push_str(", approved_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')");
         }
         if let Some(value) = completed_at {
-            if value == "datetime('now')" {
-                query.push_str(", completed_at = datetime('now')");
+            if value == "SET" {
+                query.push_str(", completed_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')");
             } else {
                 query.push_str(", completed_at = NULL");
             }
@@ -417,7 +442,7 @@ impl TaskStore {
             .bind(serde_json::to_string(&subtasks).context("failed to serialize subtasks")?)
             .bind(next_metadata.to_string());
 
-        if !input.clear_worker_id {
+        if !clear_worker {
             sql = sql.bind(next_worker_id);
         }
 
@@ -467,7 +492,8 @@ impl TaskStore {
             .try_get("task_number")
             .context("failed to read task_number from ready task row")?;
         let result = sqlx::query(
-            "UPDATE tasks SET status = 'in_progress', updated_at = datetime('now') \
+            "UPDATE tasks SET status = 'in_progress', \
+             updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') \
              WHERE task_number = ? AND status = 'ready'",
         )
         .bind(task_number)
@@ -682,6 +708,21 @@ mod tests {
         .execute(&pool)
         .await
         .expect("tasks schema should be created");
+
+        sqlx::query(
+            "CREATE TABLE task_number_seq (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                next_number INTEGER NOT NULL DEFAULT 1
+            )",
+        )
+        .execute(&pool)
+        .await
+        .expect("task_number_seq should be created");
+
+        sqlx::query("INSERT INTO task_number_seq (id, next_number) VALUES (1, 1)")
+            .execute(&pool)
+            .await
+            .expect("sequence seed should be inserted");
 
         TaskStore::new(pool)
     }

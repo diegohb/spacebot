@@ -12,6 +12,9 @@ use std::sync::Arc;
 
 #[derive(Deserialize)]
 pub(super) struct TaskListQuery {
+    /// Convenience filter: matches tasks where owner OR assigned equals this value.
+    #[serde(default)]
+    agent_id: Option<String>,
     /// Filter by owner agent. Optional.
     #[serde(default)]
     owner_agent_id: Option<String>,
@@ -167,6 +170,7 @@ pub(super) async fn list_tasks(
 
     let tasks = store
         .list(crate::tasks::TaskListFilter {
+            agent_id: query.agent_id,
             owner_agent_id: query.owner_agent_id,
             assigned_agent_id: query.assigned_agent_id,
             status,
@@ -373,6 +377,11 @@ pub(super) async fn execute_task(
         crate::tasks::TaskStatus::Ready | crate::tasks::TaskStatus::InProgress
     ) {
         return Ok(Json(TaskResponse { task: current }));
+    }
+
+    // Reject pending_approval tasks — they must be approved first.
+    if current.status == crate::tasks::TaskStatus::PendingApproval {
+        return Err(StatusCode::CONFLICT);
     }
 
     let task = store
