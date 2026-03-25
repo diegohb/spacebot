@@ -74,7 +74,7 @@ fn map_cortex_chat_send_error(error: &CortexChatSendError) -> StatusCode {
 /// If no threads exist, returns an empty list with a fresh thread_id.
 #[utoipa::path(
     get,
-    path = "/cortex/chat/messages",
+    path = "/cortex-chat/messages",
     params(
         ("agent_id" = String, Query, description = "Agent ID"),
         ("thread_id" = Option<String>, Query, description = "Thread ID (omit for latest)"),
@@ -129,7 +129,7 @@ pub(super) async fn cortex_chat_messages(
 /// - `error` — if something went wrong
 #[utoipa::path(
     post,
-    path = "/cortex/chat/send",
+    path = "/cortex-chat/send",
     request_body = CortexChatSendRequest,
     responses(
         (status = 200, description = "SSE stream of chat events"),
@@ -210,7 +210,7 @@ pub(super) struct CortexChatDeleteThreadRequest {
 /// List all cortex chat threads for an agent, newest first.
 #[utoipa::path(
     get,
-    path = "/cortex/chat/threads",
+    path = "/cortex-chat/threads",
     params(
         ("agent_id" = String, Query, description = "Agent ID"),
     ),
@@ -240,7 +240,7 @@ pub(super) async fn cortex_chat_threads(
 /// Delete a cortex chat thread and all its messages.
 #[utoipa::path(
     delete,
-    path = "/cortex/chat/threads",
+    path = "/cortex-chat/thread",
     request_body = CortexChatDeleteThreadRequest,
     responses(
         (status = 204, description = "Thread deleted successfully"),
