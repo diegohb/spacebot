@@ -1,0 +1,21 @@
+# Custom Spacebot Dockerfile
+# This extends the upstream image without modifying the original Dockerfile
+# Build with: docker-compose build
+# Run with: docker-compose up -d
+
+FROM ghcr.io/spacedriveapp/spacebot:latest
+
+# The upstream runtime image doesn't include Node.js/npm
+# We need to install it first before installing global npm packages
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    git \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Now install global npm packages
+RUN npm install -g npm@latest \
+    && npm install -g @mablhq/mabl-cli \
+    && npm install -g agent-browser

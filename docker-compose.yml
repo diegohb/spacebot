@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  spacebot:
+    build:
+      context: .
+      dockerfile: Dockerfile.custom
+    image: spacebot-custom:latest
+    container_name: deven-spacebot
+    restart: unless-stopped
+    ports:
+      - "19898:19898"
+    environment:
+      - PATH=/host-bin:/data/tools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      - SPACEBOT_CRON_TIMEZONE=America/New_York
+      - EMA_VAULT_ROOT=/mnt/c/dev/projects/pscm-dscloud/EMAKBAI
+      - AGENT_BROWSER_ENGINE=lightpanda
+    volumes:
+      - spacebot-data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+      - C:/dev/projects/pscm-dscloud/EMAKBAI:/mnt/c/dev/projects/pscm-dscloud/EMAKBAI
+      # Librarian-Agent identity files from vault
+      - C:/dev/projects/pscm-dscloud/EMAKBAI/00_Control_Plane/Prompts/librarian-agent/SOUL.md:/data/agents/librarian-agent/SOUL.md:ro
+      - C:/dev/projects/pscm-dscloud/EMAKBAI/00_Control_Plane/Prompts/librarian-agent/IDENTITY.md:/data/agents/librarian-agent/IDENTITY.md:ro
+      - C:/dev/projects/pscm-dscloud/EMAKBAI/00_Control_Plane/Prompts/librarian-agent/ROLE.md:/data/agents/librarian-agent/ROLE.md:ro
+      - C:/dev/projects/pscm-dscloud/EMAKBAI/00_Control_Plane/Prompts/librarian-agent/SKILLS/librarian-heartbeat:/data/agents/librarian-agent/workspace/skills/librarian-heartbeat:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:19898/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  spacebot-data:
+    external: true
+
+# How to extend without merge conflicts:
+
+# Your Dockerfile.custom uses FROM ghcr.io/spacedriveapp/spacebot:latest to inherit everything from upstream
+# Add custom RUN commands in your local file only
+# When upstream updates, you just rebuild: docker-compose build
+# Your customizations stay separate from the upstream repo
+# Workflow:
+
+# # Build your custom image
+# docker compose build
+
+# # Start the container
+# docker compose up -d
+
+# # Update to latest upstream and rebuild
+# docker compose pull && docker compose build && docker compose up -d
+# This way you maintain your own Dockerfile.custom and docker-compose.yml locally (can add to your own .gitignore), while pulling the base image from upstream whenever needed.
