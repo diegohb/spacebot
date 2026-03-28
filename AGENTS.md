@@ -43,6 +43,24 @@ Additional rules:
 - For changes in async/stateful paths (worker lifecycle, cancellation, retrigger, recall cache behavior), include explicit race/terminal-state reasoning in the PR summary and run targeted tests in addition to `just gate-pr`.
 - Do not push if any gate is red.
 
+## Fork Operating Mode
+
+This clone is configured for a fork workflow with explicit separation between upstream contributions and local divergence.
+
+- `origin` is the fork: `https://github.com/diegohb/spacebot.git`
+- `upstream` is the source repository: `https://github.com/spacedriveapp/spacebot.git`
+- `main` tracks `upstream/main` and should remain upstream-clean
+- `custom/main` is the long-lived branch for fork-only divergence
+
+Agent rules for this fork:
+
+- Prefer the fork helper scripts for routine fork workflows: `./scripts/fork-sync.ps1`, `./scripts/new-upstream-pr-branch.ps1`, and `./scripts/new-custom-branch.ps1`.
+- For upstream-safe work, branch from `main` into `contrib/<topic>` and keep the diff free of fork-only files.
+- For local deployment or org-specific work, branch from `custom/main` into `custom/<topic>`.
+- Treat these as fork-only unless explicitly asked otherwise: `Dockerfile.custom`, `docker-compose.yml`, `FORK-MAPPING.md`, and `scripts/*.ps1` created for fork management.
+- If a user request mixes upstream-safe code and fork-only deployment changes, split the work into separate branches.
+- Before preparing an upstream PR, inspect `git diff --name-only upstream/main...HEAD` and remove fork-only files from the branch.
+
 ## Nix Flake Workflow
 
 ### Frontend Dependencies
