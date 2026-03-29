@@ -845,6 +845,7 @@ impl Config {
             max_turns: None,
             branch_max_turns: None,
             context_window: None,
+            tool_use_enforcement: None,
             compaction: None,
             memory_persistence: None,
             coalesce: None,
@@ -1429,6 +1430,10 @@ impl Config {
                 .defaults
                 .context_window
                 .unwrap_or(base_defaults.context_window),
+            tool_use_enforcement: toml
+                .defaults
+                .tool_use_enforcement
+                .unwrap_or_else(|| base_defaults.tool_use_enforcement.clone()),
             compaction: toml
                 .defaults
                 .compaction
@@ -1670,6 +1675,7 @@ impl Config {
                     max_turns: a.max_turns,
                     branch_max_turns: a.branch_max_turns,
                     context_window: a.context_window,
+                    tool_use_enforcement: a.tool_use_enforcement,
                     compaction: a.compaction.map(|c| CompactionConfig {
                         background_threshold: c
                             .background_threshold
@@ -1803,6 +1809,7 @@ impl Config {
                 max_turns: None,
                 branch_max_turns: None,
                 context_window: None,
+                tool_use_enforcement: None,
                 compaction: None,
                 memory_persistence: None,
                 coalesce: None,

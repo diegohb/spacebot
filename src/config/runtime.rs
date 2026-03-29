@@ -6,7 +6,8 @@ use arc_swap::ArcSwap;
 use super::{
     BrowserConfig, ChannelConfig, CoalesceConfig, CompactionConfig, Config, CortexConfig,
     DefaultsConfig, IngestionConfig, McpServerConfig, MemoryPersistenceConfig, OpenCodeConfig,
-    ResolvedAgentConfig, WarmupConfig, WarmupStatus, WorkReadiness, evaluate_work_readiness,
+    ResolvedAgentConfig, ToolUseEnforcement, WarmupConfig, WarmupStatus, WorkReadiness,
+    evaluate_work_readiness,
 };
 use crate::llm::routing::RoutingConfig;
 use crate::tools::browser::SharedBrowserHandle;
@@ -34,6 +35,7 @@ pub struct RuntimeConfig {
     pub max_turns: ArcSwap<usize>,
     pub branch_max_turns: ArcSwap<usize>,
     pub context_window: ArcSwap<usize>,
+    pub tool_use_enforcement: ArcSwap<ToolUseEnforcement>,
     pub max_concurrent_branches: ArcSwap<usize>,
     pub max_concurrent_workers: ArcSwap<usize>,
     pub browser_config: ArcSwap<BrowserConfig>,
@@ -128,6 +130,7 @@ impl RuntimeConfig {
             max_turns: ArcSwap::from_pointee(agent_config.max_turns),
             branch_max_turns: ArcSwap::from_pointee(agent_config.branch_max_turns),
             context_window: ArcSwap::from_pointee(agent_config.context_window),
+            tool_use_enforcement: ArcSwap::from_pointee(agent_config.tool_use_enforcement.clone()),
             max_concurrent_branches: ArcSwap::from_pointee(agent_config.max_concurrent_branches),
             max_concurrent_workers: ArcSwap::from_pointee(agent_config.max_concurrent_workers),
             browser_config: ArcSwap::from_pointee(agent_config.browser.clone()),
@@ -295,6 +298,8 @@ impl RuntimeConfig {
         self.branch_max_turns
             .store(Arc::new(resolved.branch_max_turns));
         self.context_window.store(Arc::new(resolved.context_window));
+        self.tool_use_enforcement
+            .store(Arc::new(resolved.tool_use_enforcement.clone()));
         self.max_concurrent_branches
             .store(Arc::new(resolved.max_concurrent_branches));
         self.max_concurrent_workers

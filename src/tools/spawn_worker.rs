@@ -413,6 +413,11 @@ impl Tool for DetachedSpawnWorkerTool {
         };
 
         let browser_config = (**rc.browser_config.load()).clone();
+        let routing = rc.routing.load();
+        let model_name = routing
+            .resolve(crate::ProcessType::Worker, None)
+            .to_string();
+        let tool_use_enforcement = rc.tool_use_enforcement.load();
         let worker_system_prompt = prompt_engine
             .render_worker_prompt(
                 &rc.instance_dir.display().to_string(),
@@ -425,6 +430,13 @@ impl Tool for DetachedSpawnWorkerTool {
                 browser_config.persist_session,
                 worker_status_text,
             )
+            .and_then(|prompt| {
+                prompt_engine.maybe_append_tool_use_enforcement(
+                    prompt,
+                    tool_use_enforcement.as_ref(),
+                    &model_name,
+                )
+            })
             .map_err(|error| {
                 SpawnWorkerError(format!("failed to render worker prompt: {error}"))
             })?;

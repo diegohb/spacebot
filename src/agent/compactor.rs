@@ -125,8 +125,23 @@ impl Compactor {
         let channel_id = self.channel_id.clone();
         let deps = self.deps.clone();
         let prompt_engine = deps.runtime_config.prompts.load();
+        let routing = deps.runtime_config.routing.load();
+        let model_name = routing.resolve(ProcessType::Compactor, None).to_string();
+        let tool_use_enforcement = deps.runtime_config.tool_use_enforcement.load();
         let compactor_prompt = match prompt_engine.render_static("compactor") {
-            Ok(p) => p,
+            Ok(prompt) => match prompt_engine.maybe_append_tool_use_enforcement(
+                prompt,
+                tool_use_enforcement.as_ref(),
+                &model_name,
+            ) {
+                Ok(prompt) => prompt,
+                Err(error) => {
+                    tracing::error!(%error, "failed to append tool-use enforcement to compactor prompt");
+                    let mut flag = is_compacting.write().await;
+                    *flag = false;
+                    return;
+                }
+            },
             Err(error) => {
                 tracing::error!(%error, "failed to render compactor prompt");
                 let mut flag = is_compacting.write().await;

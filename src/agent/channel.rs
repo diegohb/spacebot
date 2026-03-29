@@ -2265,8 +2265,11 @@ impl Channel {
         };
 
         let empty_to_none = |s: String| if s.is_empty() { None } else { Some(s) };
+        let routing = rc.routing.load();
+        let model_name = routing.resolve(ProcessType::Channel, None).to_string();
+        let tool_use_enforcement = rc.tool_use_enforcement.load();
 
-        prompt_engine.render_channel_prompt_with_links(
+        let system_prompt = prompt_engine.render_channel_prompt_with_links(
             empty_to_none(identity_context),
             empty_to_none(memory_bulletin.to_string()),
             empty_to_none(skills_prompt),
@@ -2282,6 +2285,12 @@ impl Channel {
             self.backfill_transcript.clone(),
             empty_to_none(working_memory),
             empty_to_none(channel_activity_map),
+        )?;
+
+        prompt_engine.maybe_append_tool_use_enforcement(
+            system_prompt,
+            tool_use_enforcement.as_ref(),
+            &model_name,
         )
     }
 

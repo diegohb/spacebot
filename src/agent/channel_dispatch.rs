@@ -10,7 +10,7 @@ use crate::agent::channel_prompt::TemporalContext;
 use crate::agent::worker::Worker;
 use crate::error::{AgentError, Error as SpacebotError};
 use crate::tools::{BranchToolProfile, MemoryPersistenceContractState};
-use crate::{AgentDeps, BranchId, ChannelId, ProcessEvent, WorkerId};
+use crate::{AgentDeps, BranchId, ChannelId, ProcessEvent, ProcessType, WorkerId};
 use futures::FutureExt as _;
 use std::sync::Arc;
 use tokio::sync::broadcast;
@@ -126,11 +126,21 @@ pub async fn spawn_branch_from_state(
     let description = description.into();
     let rc = &state.deps.runtime_config;
     let prompt_engine = rc.prompts.load();
+    let routing = rc.routing.load();
+    let model_name = routing.resolve(ProcessType::Branch, None).to_string();
+    let tool_use_enforcement = rc.tool_use_enforcement.load();
     let system_prompt = prompt_engine
         .render_branch_prompt(
             &rc.instance_dir.display().to_string(),
             &rc.workspace_dir.display().to_string(),
         )
+        .and_then(|prompt| {
+            prompt_engine.maybe_append_tool_use_enforcement(
+                prompt,
+                tool_use_enforcement.as_ref(),
+                &model_name,
+            )
+        })
         .map_err(|e| AgentError::Other(anyhow::anyhow!("{e}")))?;
 
     spawn_branch(
@@ -159,8 +169,18 @@ pub(crate) async fn spawn_memory_persistence_branch(
     let contract_state = Arc::new(MemoryPersistenceContractState::default());
 
     let prompt_engine = deps.runtime_config.prompts.load();
+    let routing = deps.runtime_config.routing.load();
+    let model_name = routing.resolve(ProcessType::Branch, None).to_string();
+    let tool_use_enforcement = deps.runtime_config.tool_use_enforcement.load();
     let system_prompt = prompt_engine
         .render_static("memory_persistence")
+        .and_then(|prompt| {
+            prompt_engine.maybe_append_tool_use_enforcement(
+                prompt,
+                tool_use_enforcement.as_ref(),
+                &model_name,
+            )
+        })
         .map_err(|e| AgentError::Other(anyhow::anyhow!("{e}")))?;
     let prompt = prompt_engine
         .render_system_memory_persistence()
@@ -473,6 +493,9 @@ async fn spawn_worker_inner(
     };
 
     let browser_config = (**rc.browser_config.load()).clone();
+    let routing = rc.routing.load();
+    let model_name = routing.resolve(ProcessType::Worker, None).to_string();
+    let tool_use_enforcement = rc.tool_use_enforcement.load();
     let worker_system_prompt = prompt_engine
         .render_worker_prompt(
             &rc.instance_dir.display().to_string(),
@@ -485,6 +508,13 @@ async fn spawn_worker_inner(
             browser_config.persist_session,
             worker_status_text,
         )
+        .and_then(|prompt| {
+            prompt_engine.maybe_append_tool_use_enforcement(
+                prompt,
+                tool_use_enforcement.as_ref(),
+                &model_name,
+            )
+        })
         .map_err(|e| AgentError::Other(anyhow::anyhow!("{e}")))?;
     let skills = rc.skills.load();
     let brave_search_key = (**rc.brave_search_key.load()).clone();

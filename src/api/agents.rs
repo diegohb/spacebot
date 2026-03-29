@@ -709,6 +709,7 @@ pub async fn create_agent_internal(
         max_turns: None,
         branch_max_turns: None,
         context_window: None,
+        tool_use_enforcement: None,
         compaction: None,
         memory_persistence: None,
         coalesce: None,

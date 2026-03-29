@@ -474,10 +474,14 @@ async fn process_chunk(
     deps: &AgentDeps,
 ) -> anyhow::Result<()> {
     let prompt_engine = deps.runtime_config.prompts.load();
-    let ingestion_prompt = prompt_engine.render_static("ingestion")?;
-
     let routing = deps.runtime_config.routing.load();
     let model_name = routing.resolve(ProcessType::Branch, None).to_string();
+    let tool_use_enforcement = deps.runtime_config.tool_use_enforcement.load();
+    let ingestion_prompt = prompt_engine.maybe_append_tool_use_enforcement(
+        prompt_engine.render_static("ingestion")?,
+        tool_use_enforcement.as_ref(),
+        &model_name,
+    )?;
     let model = SpacebotModel::make(&deps.llm_manager, &model_name)
         .with_context(&*deps.agent_id, "branch")
         .with_worker_type("ingestion")

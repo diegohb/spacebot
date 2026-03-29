@@ -821,8 +821,11 @@ impl CortexChatSession {
         };
 
         let empty_to_none = |s: String| if s.is_empty() { None } else { Some(s) };
+        let routing = runtime_config.routing.load();
+        let model_name = routing.resolve(ProcessType::Cortex, None).to_string();
+        let tool_use_enforcement = runtime_config.tool_use_enforcement.load();
 
-        prompt_engine.render_cortex_chat_prompt(
+        let system_prompt = prompt_engine.render_cortex_chat_prompt(
             empty_to_none(identity_context),
             empty_to_none(memory_bulletin.to_string()),
             channel_transcript,
@@ -831,6 +834,12 @@ impl CortexChatSession {
             empty_to_none(runtime_config_snapshot),
             worker_capabilities,
             self.factory_enabled,
+        )?;
+
+        prompt_engine.maybe_append_tool_use_enforcement(
+            system_prompt,
+            tool_use_enforcement.as_ref(),
+            &model_name,
         )
     }
 

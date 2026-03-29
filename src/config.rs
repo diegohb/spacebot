@@ -2149,4 +2149,47 @@ command = "/usr/bin/test"
         // The mcp_servers data is silently dropped — verify it's not accessible
         assert!(parsed.defaults.mcp.is_empty());
     }
+
+    #[test]
+    fn tool_use_enforcement_parses_and_resolves() {
+        let toml = r#"
+[defaults]
+tool_use_enforcement = "always"
+
+[[agents]]
+id = "main"
+tool_use_enforcement = ["gemini", "deepseek"]
+"#;
+
+        let parsed: TomlConfig = toml::from_str(toml).expect("failed to parse test TOML");
+        let config = Config::from_toml(parsed, PathBuf::from(".")).expect("failed to build Config");
+
+        assert_eq!(
+            config.defaults.tool_use_enforcement,
+            ToolUseEnforcement::Always
+        );
+        assert_eq!(
+            config.agents[0].tool_use_enforcement,
+            Some(ToolUseEnforcement::Custom(vec![
+                "gemini".to_string(),
+                "deepseek".to_string(),
+            ]))
+        );
+
+        let resolved = config.resolve_agents();
+        assert_eq!(
+            resolved[0].tool_use_enforcement,
+            ToolUseEnforcement::Custom(vec!["gemini".to_string(), "deepseek".to_string()])
+        );
+        assert!(
+            resolved[0]
+                .tool_use_enforcement
+                .should_inject("google/gemini-2.5-pro")
+        );
+        assert!(
+            !resolved[0]
+                .tool_use_enforcement
+                .should_inject("anthropic/claude-sonnet-4")
+        );
+    }
 }

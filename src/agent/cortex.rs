@@ -1496,8 +1496,21 @@ fn handle_cortex_receiver_result(
 pub fn spawn_cortex_loop(deps: AgentDeps, logger: CortexLogger) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         let prompt_engine = deps.runtime_config.prompts.load();
+        let routing = deps.runtime_config.routing.load();
+        let model_name = routing.resolve(ProcessType::Cortex, None).to_string();
+        let tool_use_enforcement = deps.runtime_config.tool_use_enforcement.load();
         let system_prompt = match prompt_engine.render_static("cortex") {
-            Ok(prompt) => prompt,
+            Ok(prompt) => match prompt_engine.maybe_append_tool_use_enforcement(
+                prompt,
+                tool_use_enforcement.as_ref(),
+                &model_name,
+            ) {
+                Ok(prompt) => prompt,
+                Err(error) => {
+                    tracing::warn!(%error, "failed to append tool-use enforcement, using base cortex prompt");
+                    prompt_engine.render_static("cortex").unwrap_or_default()
+                }
+            },
             Err(error) => {
                 tracing::warn!(%error, "failed to render cortex prompt, using empty preamble");
                 String::new()
@@ -3275,6 +3288,9 @@ async fn pickup_one_ready_task(deps: &AgentDeps, logger: &CortexLogger) -> anyho
     let current_time_line = temporal_context.current_time_line();
     let worker_status_text = Some(system_info.render_for_worker(&current_time_line));
 
+    let routing = deps.runtime_config.routing.load();
+    let model_name = routing.resolve(ProcessType::Worker, None).to_string();
+    let tool_use_enforcement = deps.runtime_config.tool_use_enforcement.load();
     let worker_system_prompt = prompt_engine
         .render_worker_prompt(
             &deps.runtime_config.instance_dir.display().to_string(),
@@ -3287,6 +3303,13 @@ async fn pickup_one_ready_task(deps: &AgentDeps, logger: &CortexLogger) -> anyho
             browser_config.persist_session,
             worker_status_text,
         )
+        .and_then(|prompt| {
+            prompt_engine.maybe_append_tool_use_enforcement(
+                prompt,
+                tool_use_enforcement.as_ref(),
+                &model_name,
+            )
+        })
         .map_err(|error| anyhow::anyhow!("failed to render worker prompt: {error}"))?;
 
     let mut task_prompt = format!("Execute task #{}: {}", task.task_number, task.title);

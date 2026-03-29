@@ -209,6 +209,77 @@ impl<'de> serde::Deserialize<'de> for ApiType {
     }
 }
 
+/// Tool-use enforcement configuration for preventing models from describing
+/// actions instead of calling tools.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum ToolUseEnforcement {
+    /// Auto-detect based on model name (GPT/Codex models get enforcement).
+    #[default]
+    Auto,
+    /// Always inject tool-use enforcement guidance.
+    Always,
+    /// Never inject tool-use enforcement guidance.
+    Never,
+    /// Custom list of model name substrings to match.
+    Custom(Vec<String>),
+}
+
+impl ToolUseEnforcement {
+    /// Check if enforcement should be injected for the given model name.
+    pub fn should_inject(&self, model: &str) -> bool {
+        let model_lower = model.to_lowercase();
+        match self {
+            Self::Auto => {
+                // Match GPT and Codex models by default
+                model_lower.contains("gpt") || model_lower.contains("codex")
+            }
+            Self::Always => true,
+            Self::Never => false,
+            Self::Custom(patterns) => patterns
+                .iter()
+                .any(|p| model_lower.contains(&p.to_lowercase())),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ToolUseEnforcement {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        use serde::de::Error;
+        let value = toml::Value::deserialize(deserializer)?;
+        match value {
+            toml::Value::String(s) => match s.to_lowercase().as_str() {
+                "auto" => Ok(Self::Auto),
+                "true" | "always" | "yes" | "on" => Ok(Self::Always),
+                "false" | "never" | "no" | "off" => Ok(Self::Never),
+                other => Err(D::Error::invalid_value(
+                    serde::de::Unexpected::Str(other),
+                    &"one of 'auto', 'true', 'false', 'always', 'never'",
+                )),
+            },
+            toml::Value::Array(arr) => {
+                let patterns: Vec<String> = arr
+                    .into_iter()
+                    .map(|v| {
+                        v.as_str().map(String::from).ok_or_else(|| {
+                            D::Error::invalid_value(
+                                serde::de::Unexpected::Other("non-string array element"),
+                                &"array of strings",
+                            )
+                        })
+                    })
+                    .collect::<std::result::Result<_, _>>()?;
+                Ok(Self::Custom(patterns))
+            }
+            _ => Err(D::Error::invalid_value(
+                serde::de::Unexpected::Other("non-string/non-array value"),
+                &"string or array of strings",
+            )),
+        }
+    }
+}
+
 /// Configuration for a single LLM provider.
 #[derive(Clone)]
 pub struct ProviderConfig {
@@ -545,6 +616,9 @@ pub struct DefaultsConfig {
     pub user_timezone: Option<String>,
     pub history_backfill_count: usize,
     pub cron: Vec<CronDef>,
+    /// Tool-use enforcement for preventing models from describing actions instead of calling tools.
+    /// "auto" (default) — matches GPT/Codex models; true — always inject; false — never inject.
+    pub tool_use_enforcement: ToolUseEnforcement,
     pub opencode: OpenCodeConfig,
     /// Worker log mode: "errors_only", "all_separate", or "all_combined".
     pub worker_log_mode: crate::settings::WorkerLogMode,
@@ -578,6 +652,7 @@ impl std::fmt::Debug for DefaultsConfig {
             .field("user_timezone", &self.user_timezone)
             .field("history_backfill_count", &self.history_backfill_count)
             .field("cron", &self.cron)
+            .field("tool_use_enforcement", &self.tool_use_enforcement)
             .field("opencode", &self.opencode)
             .field("worker_log_mode", &self.worker_log_mode)
             .field("projects", &self.projects)
@@ -1182,6 +1257,8 @@ pub struct AgentConfig {
     pub max_turns: Option<usize>,
     pub branch_max_turns: Option<usize>,
     pub context_window: Option<usize>,
+    /// Tool-use enforcement for preventing models from describing actions instead of calling tools.
+    pub tool_use_enforcement: Option<ToolUseEnforcement>,
     pub compaction: Option<CompactionConfig>,
     pub memory_persistence: Option<MemoryPersistenceConfig>,
     pub coalesce: Option<CoalesceConfig>,
@@ -1264,6 +1341,8 @@ pub struct ResolvedAgentConfig {
     /// Number of messages to fetch from the platform when a new channel is created.
     pub history_backfill_count: usize,
     pub cron: Vec<CronDef>,
+    /// Tool-use enforcement for preventing models from describing actions instead of calling tools.
+    pub tool_use_enforcement: ToolUseEnforcement,
 }
 
 impl Default for DefaultsConfig {
@@ -1289,6 +1368,7 @@ impl Default for DefaultsConfig {
             user_timezone: None,
             history_backfill_count: 50,
             cron: Vec::new(),
+            tool_use_enforcement: ToolUseEnforcement::default(),
             opencode: OpenCodeConfig::default(),
             worker_log_mode: crate::settings::WorkerLogMode::default(),
             projects: ProjectsConfig::default(),
@@ -1365,6 +1445,10 @@ impl AgentConfig {
                 .unwrap_or_else(|| defaults.projects.clone()),
             history_backfill_count: defaults.history_backfill_count,
             cron: self.cron.clone(),
+            tool_use_enforcement: self
+                .tool_use_enforcement
+                .clone()
+                .unwrap_or_else(|| defaults.tool_use_enforcement.clone()),
         }
     }
 }

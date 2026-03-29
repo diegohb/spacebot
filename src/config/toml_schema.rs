@@ -1,5 +1,7 @@
 // -- TOML deserialization types --
 
+use super::types::ToolUseEnforcement;
+
 use serde::{Deserialize, Deserializer};
 use std::collections::HashMap;
 
@@ -278,6 +280,7 @@ pub(super) struct TomlDefaultsConfig {
     pub(super) max_turns: Option<usize>,
     pub(super) branch_max_turns: Option<usize>,
     pub(super) context_window: Option<usize>,
+    pub(super) tool_use_enforcement: Option<ToolUseEnforcement>,
     pub(super) compaction: Option<TomlCompactionConfig>,
     pub(super) memory_persistence: Option<TomlMemoryPersistenceConfig>,
     pub(super) coalesce: Option<TomlCoalesceConfig>,
@@ -456,6 +459,7 @@ pub(super) struct TomlAgentConfig {
     pub(super) max_turns: Option<usize>,
     pub(super) branch_max_turns: Option<usize>,
     pub(super) context_window: Option<usize>,
+    pub(super) tool_use_enforcement: Option<ToolUseEnforcement>,
     pub(super) compaction: Option<TomlCompactionConfig>,
     pub(super) memory_persistence: Option<TomlMemoryPersistenceConfig>,
     pub(super) coalesce: Option<TomlCoalesceConfig>,
