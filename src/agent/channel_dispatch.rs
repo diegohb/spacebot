@@ -537,7 +537,11 @@ async fn spawn_worker_inner(
     // Append tool-use enforcement after skills so it's the last instruction
     // in the preamble ("last instruction wins").
     let mut system_prompt = prompt_engine
-        .maybe_append_tool_use_enforcement(system_prompt, tool_use_enforcement.as_ref(), &model_name)
+        .maybe_append_tool_use_enforcement(
+            system_prompt,
+            tool_use_enforcement.as_ref(),
+            &model_name,
+        )
         .map_err(|e| AgentError::Other(anyhow::anyhow!("{e}")))?;
 
     // Inject memory context based on worker_context settings
