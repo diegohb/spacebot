@@ -925,7 +925,10 @@ async fn update_azure_provider(
     request: ProviderUpdateRequest,
     normalized_model: &str,
 ) -> Result<Json<ProviderUpdateResponse>, StatusCode> {
-    let base_url = request.base_url.as_ref().ok_or_else(|| StatusCode::BAD_REQUEST)?;
+    let base_url = request
+        .base_url
+        .as_ref()
+        .ok_or_else(|| StatusCode::BAD_REQUEST)?;
     let normalized_base_url = base_url.trim().trim_end_matches('/');
 
     if !normalized_base_url.ends_with(".openai.azure.com") {
@@ -935,13 +938,15 @@ async fn update_azure_provider(
         }));
     }
 
-    let api_version = request.api_version.as_ref().ok_or_else(|| StatusCode::BAD_REQUEST)?;
-    let api_version_regex = regex::Regex::new(r"^\d{4}-\d{2}-\d{2}(-preview)?$")
-        .map_err(|e| {
-            tracing::error!(error = %e, "failed to compile api_version regex");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-    
+    let api_version = request
+        .api_version
+        .as_ref()
+        .ok_or_else(|| StatusCode::BAD_REQUEST)?;
+    let api_version_regex = regex::Regex::new(r"^\d{4}-\d{2}-\d{2}(-preview)?$").map_err(|e| {
+        tracing::error!(error = %e, "failed to compile api_version regex");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
     if !api_version_regex.is_match(api_version.trim()) {
         return Ok(Json(ProviderUpdateResponse {
             success: false,
@@ -949,17 +954,20 @@ async fn update_azure_provider(
         }));
     }
 
-    let deployment = request.deployment.as_ref().ok_or_else(|| StatusCode::BAD_REQUEST)?;
-    let deployment_regex = regex::Regex::new(r"^[a-zA-Z0-9.-]+$")
-        .map_err(|e| {
-            tracing::error!(error = %e, "failed to compile deployment regex");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-    
+    let deployment = request
+        .deployment
+        .as_ref()
+        .ok_or_else(|| StatusCode::BAD_REQUEST)?;
+    let deployment_regex = regex::Regex::new(r"^[a-zA-Z0-9.-]+$").map_err(|e| {
+        tracing::error!(error = %e, "failed to compile deployment regex");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
     if !deployment_regex.is_match(deployment.trim()) {
         return Ok(Json(ProviderUpdateResponse {
             success: false,
-            message: "Deployment name must contain only alphanumeric characters, hyphens, and dots".to_string(),
+            message: "Deployment name must contain only alphanumeric characters, hyphens, and dots"
+                .to_string(),
         }));
     }
 
@@ -998,7 +1006,8 @@ async fn update_azure_provider(
     // Determine the API key: use incoming if non-empty, otherwise preserve existing
     let api_key = if request.api_key.trim().is_empty() {
         // Read existing API key from config
-        match doc.get("llm")
+        match doc
+            .get("llm")
             .and_then(|llm| llm.get("provider"))
             .and_then(|provider| provider.get("azure"))
             .and_then(|azure| azure.get("api_key"))
@@ -1037,30 +1046,35 @@ async fn update_azure_provider(
     if doc.get("defaults").is_none() {
         doc["defaults"] = toml_edit::Item::Table(toml_edit::Table::new());
     }
-    
+
     if let Some(defaults) = doc.get_mut("defaults").and_then(|item| item.as_table_mut()) {
         if defaults.get("routing").is_none() {
             defaults["routing"] = toml_edit::Item::Table(toml_edit::Table::new());
         }
-        
+
         if let Some(routing_table) = defaults
             .get_mut("routing")
             .and_then(|item| item.as_table_mut())
         {
             if routing_table.get("channel").is_none() {
-                routing_table["channel"] = toml_edit::value(format!("azure/{}", normalized_deployment));
+                routing_table["channel"] =
+                    toml_edit::value(format!("azure/{}", normalized_deployment));
             }
             if routing_table.get("branch").is_none() {
-                routing_table["branch"] = toml_edit::value(format!("azure/{}", normalized_deployment));
+                routing_table["branch"] =
+                    toml_edit::value(format!("azure/{}", normalized_deployment));
             }
             if routing_table.get("worker").is_none() {
-                routing_table["worker"] = toml_edit::value(format!("azure/{}", normalized_deployment));
+                routing_table["worker"] =
+                    toml_edit::value(format!("azure/{}", normalized_deployment));
             }
             if routing_table.get("compactor").is_none() {
-                routing_table["compactor"] = toml_edit::value(format!("azure/{}", normalized_deployment));
+                routing_table["compactor"] =
+                    toml_edit::value(format!("azure/{}", normalized_deployment));
             }
             if routing_table.get("cortex").is_none() {
-                routing_table["cortex"] = toml_edit::value(format!("azure/{}", normalized_deployment));
+                routing_table["cortex"] =
+                    toml_edit::value(format!("azure/{}", normalized_deployment));
             }
         }
     }
@@ -1119,7 +1133,7 @@ pub(super) async fn get_provider_config(
     axum::extract::Path(provider): axum::extract::Path<String>,
 ) -> Result<Json<ProviderConfigResponse>, StatusCode> {
     let normalized_provider = provider.trim().to_lowercase();
-    
+
     // Only Azure needs special config retrieval
     if normalized_provider != "azure" {
         return Ok(Json(ProviderConfigResponse {
@@ -1157,9 +1171,18 @@ pub(super) async fn get_provider_config(
         .and_then(|provider| provider.get("azure"));
 
     if let Some(azure_table) = azure_config.and_then(|item| item.as_table_like()) {
-        let base_url = azure_table.get("base_url").and_then(|v| v.as_str()).map(String::from);
-        let api_version = azure_table.get("api_version").and_then(|v| v.as_str()).map(String::from);
-        let deployment = azure_table.get("deployment").and_then(|v| v.as_str()).map(String::from);
+        let base_url = azure_table
+            .get("base_url")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+        let api_version = azure_table
+            .get("api_version")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+        let deployment = azure_table
+            .get("deployment")
+            .and_then(|v| v.as_str())
+            .map(String::from);
 
         if base_url.is_some() || api_version.is_some() || deployment.is_some() {
             return Ok(Json(ProviderConfigResponse {
@@ -1195,21 +1218,21 @@ pub(super) async fn test_provider_model(
     State(state): State<Arc<ApiState>>,
     Json(request): Json<ProviderModelTestRequest>,
 ) -> Result<Json<ProviderModelTestResponse>, StatusCode> {
-	let normalized_provider = request.provider.trim().to_lowercase();
-	let normalized_model = request.model.trim().to_string();
-	
-	// Azure is handled specially and doesn't have a TOML key
-	if normalized_provider == "azure" {
-		// Azure validation happens later in the function
-	} else if provider_toml_key(&normalized_provider).is_none() {
-		return Ok(Json(ProviderModelTestResponse {
-			success: false,
-			message: format!("Unknown provider: {}", request.provider),
-			provider: request.provider,
-			model: request.model,
-			sample: None,
-		}));
-	}
+    let normalized_provider = request.provider.trim().to_lowercase();
+    let normalized_model = request.model.trim().to_string();
+
+    // Azure is handled specially and doesn't have a TOML key
+    if normalized_provider == "azure" {
+        // Azure validation happens later in the function
+    } else if provider_toml_key(&normalized_provider).is_none() {
+        return Ok(Json(ProviderModelTestResponse {
+            success: false,
+            message: format!("Unknown provider: {}", request.provider),
+            provider: request.provider,
+            model: request.model,
+            sample: None,
+        }));
+    }
 
     // Determine the API key to use
     let api_key_to_use = if request.api_key.trim().is_empty() {
@@ -1276,7 +1299,10 @@ pub(super) async fn test_provider_model(
     }
 
     if normalized_provider == "azure" {
-        let base_url = request.base_url.as_ref().ok_or_else(|| StatusCode::BAD_REQUEST)?;
+        let base_url = request
+            .base_url
+            .as_ref()
+            .ok_or_else(|| StatusCode::BAD_REQUEST)?;
         let normalized_base_url = base_url.trim().trim_end_matches('/');
 
         if !normalized_base_url.ends_with(".openai.azure.com") {
@@ -1289,34 +1315,42 @@ pub(super) async fn test_provider_model(
             }));
         }
 
-        let api_version = request.api_version.as_ref().ok_or_else(|| StatusCode::BAD_REQUEST)?;
-        let api_version_regex = regex::Regex::new(r"^\d{4}-\d{2}-\d{2}(-preview)?$")
-            .map_err(|e| {
+        let api_version = request
+            .api_version
+            .as_ref()
+            .ok_or_else(|| StatusCode::BAD_REQUEST)?;
+        let api_version_regex =
+            regex::Regex::new(r"^\d{4}-\d{2}-\d{2}(-preview)?$").map_err(|e| {
                 tracing::error!(error = %e, "failed to compile api_version regex");
                 StatusCode::INTERNAL_SERVER_ERROR
             })?;
-        
+
         if !api_version_regex.is_match(api_version.trim()) {
             return Ok(Json(ProviderModelTestResponse {
                 success: false,
-                message: "API version must match format: YYYY-MM-DD or YYYY-MM-DD-preview".to_string(),
+                message: "API version must match format: YYYY-MM-DD or YYYY-MM-DD-preview"
+                    .to_string(),
                 provider: request.provider,
                 model: request.model,
                 sample: None,
             }));
         }
 
-        let deployment = request.deployment.as_ref().ok_or_else(|| StatusCode::BAD_REQUEST)?;
-        let deployment_regex = regex::Regex::new(r"^[a-zA-Z0-9.-]+$")
-            .map_err(|e| {
-                tracing::error!(error = %e, "failed to compile deployment regex");
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
-        
+        let deployment = request
+            .deployment
+            .as_ref()
+            .ok_or_else(|| StatusCode::BAD_REQUEST)?;
+        let deployment_regex = regex::Regex::new(r"^[a-zA-Z0-9.-]+$").map_err(|e| {
+            tracing::error!(error = %e, "failed to compile deployment regex");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
         if !deployment_regex.is_match(deployment.trim()) {
             return Ok(Json(ProviderModelTestResponse {
                 success: false,
-                message: "Deployment name must contain only alphanumeric characters, hyphens, and dots".to_string(),
+                message:
+                    "Deployment name must contain only alphanumeric characters, hyphens, and dots"
+                        .to_string(),
                 provider: request.provider,
                 model: request.model,
                 sample: None,

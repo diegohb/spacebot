@@ -213,29 +213,24 @@ impl SpacebotModel {
                             .to_string()
                     ))?;
 
-                let api_version = provider_config
-                    .api_version
-                    .as_ref()
-                    .ok_or_else(|| CompletionError::ProviderError(
+                let api_version = provider_config.api_version.as_ref().ok_or_else(|| {
+                    CompletionError::ProviderError(
                         "Azure API version is required. Example: '2024-12-01-preview'\n\
                         Find available API versions in the Azure OpenAI documentation."
-                            .to_string()
-                    ))?;
+                            .to_string(),
+                    )
+                })?;
 
                 let endpoint = format!(
                     "https://{}.openai.azure.com/openai/deployments/{}/chat/completions?api-version={}",
                     resource, deployment, api_version
                 );
 
-                let display_name = provider_config
-                    .name
-                    .as_deref()
-                    .unwrap_or("Azure OpenAI");
+                let display_name = provider_config.name.as_deref().unwrap_or("Azure OpenAI");
 
                 // Azure uses "api-key" header instead of Authorization
-                let headers: Vec<(&str, &str)> = vec![
-                    ("api-key", provider_config.api_key.as_str()),
-                ];
+                let headers: Vec<(&str, &str)> =
+                    vec![("api-key", provider_config.api_key.as_str())];
 
                 self.call_openai_compatible_with_optional_auth(
                     request,
@@ -658,28 +653,23 @@ impl CompletionModel for SpacebotModel {
                             .to_string()
                     ))?;
 
-                let api_version = provider_config
-                    .api_version
-                    .as_ref()
-                    .ok_or_else(|| CompletionError::ProviderError(
+                let api_version = provider_config.api_version.as_ref().ok_or_else(|| {
+                    CompletionError::ProviderError(
                         "Azure API version is required. Example: '2024-12-01-preview'\n\
                         Find available API versions in the Azure OpenAI documentation."
-                            .to_string()
-                    ))?;
+                            .to_string(),
+                    )
+                })?;
 
                 let endpoint = format!(
                     "https://{}.openai.azure.com/openai/deployments/{}/chat/completions?api-version={}",
                     resource, deployment, api_version
                 );
 
-                let display_name = provider_config
-                    .name
-                    .as_deref()
-                    .unwrap_or("Azure OpenAI");
+                let display_name = provider_config.name.as_deref().unwrap_or("Azure OpenAI");
 
-                let headers: Vec<(&str, &str)> = vec![
-                    ("api-key", provider_config.api_key.as_str()),
-                ];
+                let headers: Vec<(&str, &str)> =
+                    vec![("api-key", provider_config.api_key.as_str())];
 
                 self.stream_openai_compatible_with_optional_auth(
                     request,
