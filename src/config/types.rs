@@ -1638,6 +1638,11 @@ pub struct Binding {
     /// Channel IDs this binding applies to. If empty, all channels in the guild/workspace are allowed.
     pub channel_ids: Vec<String>,
     /// Require explicit @mention (or reply-to-bot) for inbound messages.
+    /// Messages that don't match are blocked at the routing level and never
+    /// reach the channel — the agent cannot see them at all.
+    /// For context-aware mention filtering (agent sees messages but only
+    /// responds to mentions), use the channel-level `MentionOnly` response
+    /// mode instead.
     pub require_mention: bool,
     /// User IDs allowed to DM the bot through this binding.
     pub dm_allowed_users: Vec<String>,

@@ -1428,12 +1428,29 @@ impl Channel {
                 response_mode = ?self.resolved_settings.response_mode,
                 "suppressing unsolicited coalesced batch"
             );
-            // In Quiet mode, keep passive memory capture.
-            // In MentionOnly mode, skip memory persistence.
-            if matches!(self.resolved_settings.response_mode, ResponseMode::Quiet) {
-                self.message_count += message_count;
-                self.check_memory_persistence().await;
+            // In MentionOnly mode, inject batch messages into in-memory history
+            // so the LLM retains channel context when eventually triggered.
+            if matches!(
+                self.resolved_settings.response_mode,
+                ResponseMode::MentionOnly
+            ) {
+                {
+                    let mut history = self.state.history.write().await;
+                    for (formatted_text, _, _) in &pending_batch_entries {
+                        history.push(rig::message::Message::User {
+                            content: OneOrMany::one(UserContent::text(formatted_text)),
+                        });
+                    }
+                }
+                // Compaction guard: suppressed messages accumulate in history
+                // without agent turns, so check compaction to prevent unbounded growth.
+                if let Err(error) = self.compactor.check_and_compact().await {
+                    tracing::warn!(channel_id = %self.id, %error, "compaction check failed");
+                }
             }
+            // Both Quiet and MentionOnly keep passive memory capture.
+            self.message_count += message_count;
+            self.check_memory_persistence().await;
             return Ok(());
         }
 
@@ -1846,12 +1863,27 @@ impl Channel {
                     response_mode = ?self.resolved_settings.response_mode,
                     "suppressing unsolicited reply"
                 );
-                // In Quiet mode, keep passive memory capture.
-                // In MentionOnly mode, skip memory persistence entirely.
-                if matches!(self.resolved_settings.response_mode, ResponseMode::Quiet) {
-                    self.message_count += 1;
-                    self.check_memory_persistence().await;
+                // In MentionOnly mode, inject the message into in-memory history
+                // so the LLM retains channel context when eventually triggered.
+                if matches!(
+                    self.resolved_settings.response_mode,
+                    ResponseMode::MentionOnly
+                ) {
+                    {
+                        let mut history = self.state.history.write().await;
+                        history.push(rig::message::Message::User {
+                            content: OneOrMany::one(UserContent::text(&user_text)),
+                        });
+                    }
+                    // Compaction guard: suppressed messages accumulate in history
+                    // without agent turns, so check compaction to prevent unbounded growth.
+                    if let Err(error) = self.compactor.check_and_compact().await {
+                        tracing::warn!(channel_id = %self.id, %error, "compaction check failed");
+                    }
                 }
+                // Both Quiet and MentionOnly keep passive memory capture.
+                self.message_count += 1;
+                self.check_memory_persistence().await;
                 return Ok(());
             }
         }
