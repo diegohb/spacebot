@@ -13,7 +13,7 @@ import {
 	type RelationType,
 } from "@/api/client";
 import { formatTimeAgo } from "@/lib/format";
-import { Button, CircleButton } from "@spaceui/primitives";
+import { Button, CircleButton } from "@spacedrive/primitives";
 import { Crosshair, Plus, Minus, ArrowsClockwise, X } from "@phosphor-icons/react";
 
 // -- Constants --

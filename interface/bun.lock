@@ -22,11 +22,11 @@
         "@lobehub/icons": "^4.6.0",
         "@phosphor-icons/react": "^2.1.10",
         "@react-sigma/core": "^5.0.6",
-        "@spaceui/ai": "link:@spaceui/ai",
-        "@spaceui/explorer": "link:@spaceui/explorer",
-        "@spaceui/forms": "link:@spaceui/forms",
-        "@spaceui/primitives": "link:@spaceui/primitives",
-        "@spaceui/tokens": "link:@spaceui/tokens",
+        "@spacedrive/ai": "link:@spacedrive/ai",
+        "@spacedrive/explorer": "link:@spacedrive/explorer",
+        "@spacedrive/forms": "link:@spacedrive/forms",
+        "@spacedrive/primitives": "link:@spacedrive/primitives",
+        "@spacedrive/tokens": "link:@spacedrive/tokens",
         "@tanstack/react-query": "^5.62.0",
         "@tanstack/react-query-devtools": "^5.91.3",
         "@tanstack/react-router": "^1.159.5",
@@ -437,15 +437,15 @@
 
     "@shikijs/vscode-textmate": ["@shikijs/vscode-textmate@10.0.2", "", {}, "sha512-83yeghZ2xxin3Nj8z1NMd/NCuca+gsYXswywDy5bHvwlWL8tpTQmzGeUuHd9FC3E/SBEMvzJRwWEOz5gGes9Qg=="],
 
-    "@spaceui/ai": ["@spaceui/ai@link:@spaceui/ai", {}],
+    "@spacedrive/ai": ["@spacedrive/ai@link:@spacedrive/ai", {}],
 
-    "@spaceui/explorer": ["@spaceui/explorer@link:@spaceui/explorer", {}],
+    "@spacedrive/explorer": ["@spacedrive/explorer@link:@spacedrive/explorer", {}],
 
-    "@spaceui/forms": ["@spaceui/forms@link:@spaceui/forms", {}],
+    "@spacedrive/forms": ["@spacedrive/forms@link:@spacedrive/forms", {}],
 
-    "@spaceui/primitives": ["@spaceui/primitives@link:@spaceui/primitives", {}],
+    "@spacedrive/primitives": ["@spacedrive/primitives@link:@spacedrive/primitives", {}],
 
-    "@spaceui/tokens": ["@spaceui/tokens@link:@spaceui/tokens", {}],
+    "@spacedrive/tokens": ["@spacedrive/tokens@link:@spacedrive/tokens", {}],
 
     "@splinetool/runtime": ["@splinetool/runtime@0.9.526", "", { "dependencies": { "on-change": "^4.0.0", "semver-compare": "^1.0.0" } }, "sha512-qznHbXA5aKwDbCgESAothCNm1IeEZcmNWG145p5aXj4w5uoqR1TZ9qkTHTKLTsUbHeitCwdhzmRqan1kxboLgQ=="],
 

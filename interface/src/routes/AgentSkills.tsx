@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { api, type SkillInfo, type RegistrySkill, type RegistryView } from "@/api/client";
-import { Button, Badge, DialogRoot, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@spaceui/primitives";
+import { Button, Badge, DialogRoot, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@spacedrive/primitives";
 import { clsx } from "clsx";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {

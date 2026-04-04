@@ -8,7 +8,7 @@ import type { ConversationSettings, ConversationDefaultsResponse } from "@/api/t
 import { isOpenCodeWorker, type ActiveBranch, type ActiveWorker, type ChannelLiveState } from "@/hooks/useChannelLiveState";
 import { LiveDuration } from "@/components/LiveDuration";
 import { ConversationSettingsPanel } from "@/components/ConversationSettingsPanel";
-import { PopoverRoot, PopoverTrigger, PopoverContent } from "@spaceui/primitives";
+import { PopoverRoot, PopoverTrigger, PopoverContent } from "@spacedrive/primitives";
 import { formatTimeAgo, formatTimestamp, platformIcon, platformColor } from "@/lib/format";
 
 const VISIBLE_MESSAGES = 6;

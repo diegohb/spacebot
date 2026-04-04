@@ -2,7 +2,7 @@ import {useState, useRef, useCallback} from "react";
 import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
 import {api, type IngestFileInfo} from "@/api/client";
 import {formatTimeAgo} from "@/lib/format";
-import {Badge} from "@spaceui/primitives";
+import {Badge} from "@spacedrive/primitives";
 import {clsx} from "clsx";
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
 import {faTrash} from "@fortawesome/free-solid-svg-icons";

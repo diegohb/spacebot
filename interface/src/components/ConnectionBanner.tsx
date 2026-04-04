@@ -1,4 +1,4 @@
-import { Banner } from "@spaceui/primitives";
+import { Banner } from "@spacedrive/primitives";
 import type { ConnectionState } from "@/hooks/useEventSource";
 
 const stateConfig: Record<Exclude<ConnectionState, "connected">, { label: string; variant: "info" | "warning" | "error" }> = {

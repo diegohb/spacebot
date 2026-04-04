@@ -1,5 +1,5 @@
 import {useState} from "react";
-import {Button, Input, DialogRoot, DialogContent, DialogHeader, DialogTitle, DialogFooter} from "@spaceui/primitives";
+import {Button, Input, DialogRoot, DialogContent, DialogHeader, DialogTitle, DialogFooter} from "@spacedrive/primitives";
 import type {PortalConversationSummary} from "@/api/types";
 
 interface ConversationsSidebarProps {

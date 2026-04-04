@@ -8,7 +8,7 @@ import { LiveDuration } from "@/components/LiveDuration";
 import { Markdown } from "@/components/Markdown";
 import { PromptInspectModal } from "@/components/PromptInspectModal";
 import { formatTimestamp, platformIcon, platformColor } from "@/lib/format";
-import { Button } from "@spaceui/primitives";
+import { Button } from "@spacedrive/primitives";
 import { X, Lightbulb, Code } from "@phosphor-icons/react";
 
 interface ChannelDetailProps {

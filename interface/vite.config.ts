@@ -50,27 +50,27 @@ export default defineConfig({
 
 			// SpaceUI — resolve to source for HMR
 			{
-				find: "@spaceui/tokens/src/css",
+				find: "@spacedrive/tokens/src/css",
 				replacement: `${spaceui}/tokens/src/css`,
 			},
 			{
-				find: "@spaceui/tokens",
+				find: "@spacedrive/tokens",
 				replacement: `${spaceui}/tokens`,
 			},
 			{
-				find: "@spaceui/primitives",
+				find: "@spacedrive/primitives",
 				replacement: `${spaceui}/primitives/src/index.ts`,
 			},
 			{
-				find: "@spaceui/ai",
+				find: "@spacedrive/ai",
 				replacement: `${spaceui}/ai/src/index.ts`,
 			},
 			{
-				find: "@spaceui/forms",
+				find: "@spacedrive/forms",
 				replacement: `${spaceui}/forms/src/index.ts`,
 			},
 			{
-				find: "@spaceui/explorer",
+				find: "@spacedrive/explorer",
 				replacement: `${spaceui}/explorer/src/index.ts`,
 			},
 
@@ -81,11 +81,11 @@ export default defineConfig({
 
 	optimizeDeps: {
 		exclude: [
-			"@spaceui/tokens",
-			"@spaceui/primitives",
-			"@spaceui/ai",
-			"@spaceui/forms",
-			"@spaceui/explorer",
+			"@spacedrive/tokens",
+			"@spacedrive/primitives",
+			"@spacedrive/ai",
+			"@spacedrive/forms",
+			"@spacedrive/explorer",
 		],
 	},
 

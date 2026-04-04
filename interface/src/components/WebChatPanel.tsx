@@ -6,7 +6,7 @@ import {useLiveContext} from "@/hooks/useLiveContext";
 import {Markdown} from "@/components/Markdown";
 import {ConversationSettingsPanel} from "@/components/ConversationSettingsPanel";
 import {ConversationsSidebar} from "@/components/ConversationsSidebar";
-import {Button, PopoverRoot, PopoverTrigger, PopoverContent} from "@spaceui/primitives";
+import {Button, PopoverRoot, PopoverTrigger, PopoverContent} from "@spacedrive/primitives";
 import {api, type ConversationDefaultsResponse, type ConversationSettings} from "@/api/client";
 import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
 import {GearSix} from "@phosphor-icons/react";

@@ -15,7 +15,7 @@ import {
 	SelectValue,
 	SelectContent,
 	SelectItem,
-} from "@spaceui/primitives";
+} from "@spacedrive/primitives";
 import {PlatformIcon} from "@/lib/platformIcons";
 import {TagInput} from "@/components/TagInput";
 

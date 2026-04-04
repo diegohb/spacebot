@@ -9,7 +9,7 @@ import {
 import { CortexChatPanel } from "@/components/CortexChatPanel";
 import { formatTimeAgo } from "@/lib/format";
 import { Lightbulb } from "@phosphor-icons/react";
-import { FilterButton, Button } from "@spaceui/primitives";
+import { FilterButton, Button } from "@spacedrive/primitives";
 
 const PAGE_SIZE = 50;
 

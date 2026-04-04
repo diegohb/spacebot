@@ -35,7 +35,7 @@ import {
 	type LinkDirection,
 	type LinkKind,
 } from "@/api/client";
-import { Button, Input, TextArea, DialogRoot, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@spaceui/primitives";
+import { Button, Input, TextArea, DialogRoot, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@spacedrive/primitives";
 import { cx } from "class-variance-authority";
 import { Markdown } from "@/components/Markdown";
 import { Link } from "@tanstack/react-router";

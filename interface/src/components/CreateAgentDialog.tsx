@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, type PresetMeta } from "@/api/client";
-import { DialogRoot, DialogContent } from "@spaceui/primitives";
+import { DialogRoot, DialogContent } from "@spacedrive/primitives";
 import { CortexChatPanel } from "@/components/CortexChatPanel";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {

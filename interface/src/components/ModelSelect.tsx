@@ -1,5 +1,5 @@
 import { api, type ModelInfo } from "@/api/client";
-import { Input } from "@spaceui/primitives";
+import { Input } from "@spacedrive/primitives";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 

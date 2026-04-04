@@ -10,7 +10,7 @@ import {
   type CreateTaskRequest,
 } from "@/api/client";
 import { useLiveContext } from "@/hooks/useLiveContext";
-import { Badge, Button, DialogRoot, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@spaceui/primitives";
+import { Badge, Button, DialogRoot, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@spacedrive/primitives";
 import { Markdown } from "@/components/Markdown";
 import { formatTimeAgo } from "@/lib/format";
 import { AnimatePresence, motion } from "framer-motion";

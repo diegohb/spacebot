@@ -2,7 +2,7 @@ import {useState} from "react";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {useNavigate} from "@tanstack/react-router";
 import {api} from "@/api/client";
-import {Button, Input, DialogRoot, DialogContent, DialogHeader, DialogTitle, DialogFooter} from "@spaceui/primitives";
+import {Button, Input, DialogRoot, DialogContent, DialogHeader, DialogTitle, DialogFooter} from "@spacedrive/primitives";
 
 interface DeleteAgentDialogProps {
 	open: boolean;

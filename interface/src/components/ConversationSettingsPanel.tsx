@@ -8,7 +8,7 @@ import {
 	SelectItem,
 	SelectGroup,
 	SelectLabel,
-} from "@spaceui/primitives";
+} from "@spacedrive/primitives";
 import type { ConversationSettings, ConversationDefaultsResponse } from "@/api/types";
 
 interface ConversationSettingsPanelProps {

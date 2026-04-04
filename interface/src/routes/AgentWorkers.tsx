@@ -11,7 +11,7 @@ import {
 	type OpenCodePart,
 } from "@/api/client";
 import {ToolCall, pairTranscriptSteps, openCodePartToPair} from "@/components/ToolCall";
-import {Badge, badgeVariants} from "@spaceui/primitives";
+import {Badge, badgeVariants} from "@spacedrive/primitives";
 import {formatTimeAgo, formatDuration} from "@/lib/format";
 import {LiveDuration} from "@/components/LiveDuration";
 import {useLiveContext} from "@/hooks/useLiveContext";

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, lazy, Suspense } from "react";
-import { Button, Input } from "@spaceui/primitives";
+import { Button, Input } from "@spacedrive/primitives";
 import { useServer } from "@/hooks/useServer";
 import { IS_TAURI } from "@/platform";
 
