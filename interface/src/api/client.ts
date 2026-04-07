@@ -2469,4 +2469,43 @@ export const api = {
 	},
 
 	getEventsUrl: () => `${getApiBase()}/events`,
+
+	usage: (params?: { agent_id?: string; since?: string; until?: string; group_by?: string }) => {
+		const qs = new URLSearchParams();
+		if (params?.agent_id) qs.set("agent_id", params.agent_id);
+		if (params?.since) qs.set("since", params.since);
+		if (params?.until) qs.set("until", params.until);
+		if (params?.group_by) qs.set("group_by", params.group_by);
+		const query = qs.toString();
+		return fetchJson<UsageResponse>(`/usage${query ? `?${query}` : ""}`);
+	},
+}
+
+export interface UsageTotals {
+	input_tokens: number;
+	output_tokens: number;
+	cache_read_tokens: number;
+	cache_write_tokens: number;
+	reasoning_tokens: number;
+	request_count: number;
+	estimated_cost_usd: number | null;
+	cost_status: string;
+}
+
+export interface UsageByModel {
+	model: string;
+	input_tokens: number;
+	output_tokens: number;
+	cache_read_tokens: number;
+	cache_write_tokens: number;
+	reasoning_tokens: number;
+	request_count: number;
+	estimated_cost_usd: number | null;
+}
+
+export interface UsageResponse {
+	total: UsageTotals;
+	by_model?: UsageByModel[];
+	by_day?: Array<{ date: string } & UsageTotals>;
+	by_agent?: Array<{ agent_id: string } & UsageTotals>;
 };

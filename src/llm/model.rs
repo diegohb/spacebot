@@ -24,6 +24,7 @@ use rig::streaming::{RawStreamingChoice, RawStreamingToolCall, StreamingCompleti
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 
 const STREAM_REQUEST_TIMEOUT_SECS: u64 = 30 * 60;
 
@@ -60,6 +61,7 @@ pub struct SpacebotModel {
     agent_id: Option<String>,
     process_type: Option<String>,
     worker_type: Option<String>,
+    usage_accumulator: Option<Arc<Mutex<crate::llm::usage::UsageAccumulator>>>,
 }
 
 impl SpacebotModel {
@@ -93,6 +95,15 @@ impl SpacebotModel {
     /// Attach a worker type label for metrics (e.g. "builtin", "opencode").
     pub fn with_worker_type(mut self, worker_type: impl Into<String>) -> Self {
         self.worker_type = Some(worker_type.into());
+        self
+    }
+
+    /// Attach a shared usage accumulator for token tracking.
+    pub fn with_accumulator(
+        mut self,
+        accumulator: Arc<Mutex<crate::llm::usage::UsageAccumulator>>,
+    ) -> Self {
+        self.usage_accumulator = Some(accumulator);
         self
     }
 
@@ -355,6 +366,7 @@ impl CompletionModel for SpacebotModel {
             agent_id: None,
             process_type: None,
             worker_type: None,
+            usage_accumulator: None,
         }
     }
 
@@ -567,6 +579,26 @@ impl CompletionModel for SpacebotModel {
                         .with_label_values(&[agent_label, tier_label])
                         .inc();
                 }
+            }
+        }
+
+        // Record usage in the accumulator (if attached).
+        if let Some(ref accumulator) = self.usage_accumulator {
+            if let Ok(ref response) = result {
+                let body = &response.raw_response.body;
+                let extended = if self.provider == "anthropic" {
+                    crate::llm::usage::ExtendedUsage::from_anthropic_body(body)
+                } else {
+                    crate::llm::usage::ExtendedUsage::from_openai_body(body)
+                };
+                let cost = crate::llm::pricing::estimate_cost_extended(
+                    &self.full_model_name,
+                    &extended,
+                );
+                accumulator
+                    .lock()
+                    .await
+                    .add(extended, &self.full_model_name, &self.provider, cost);
             }
         }
 
@@ -1127,6 +1159,9 @@ impl SpacebotModel {
         }
 
         let provider_label = provider_label.to_string();
+        let stream_accumulator = self.usage_accumulator.clone();
+        let stream_model_name = self.full_model_name.clone();
+        let stream_provider = self.provider.clone();
         let stream = async_stream::stream! {
             let mut stream = response.bytes_stream();
             let mut block_buffer = String::new();
@@ -1253,6 +1288,7 @@ impl SpacebotModel {
                     }
                 };
 
+                record_streaming_usage(&stream_accumulator, &response_body, &stream_model_name, &stream_provider).await;
                 yield Ok(RawStreamingChoice::FinalResponse(RawStreamingResponse {
                     body: response_body,
                     usage: Some(parsed_response.usage),
@@ -1285,6 +1321,7 @@ impl SpacebotModel {
             if let Some(message_id) = parsed_response.message_id {
                 yield Ok(RawStreamingChoice::MessageId(message_id));
             }
+            record_streaming_usage(&stream_accumulator, &response_body, &stream_model_name, &stream_provider).await;
             yield Ok(RawStreamingChoice::FinalResponse(RawStreamingResponse {
                 body: response_body,
                 usage: Some(parsed_response.usage),
@@ -1538,6 +1575,9 @@ impl SpacebotModel {
         }
 
         let provider_label = provider_label.to_string();
+        let stream_accumulator = self.usage_accumulator.clone();
+        let stream_model_name = self.full_model_name.clone();
+        let stream_provider = self.provider.clone();
         let stream = async_stream::stream! {
             let mut stream = response.bytes_stream();
             let mut block_buffer = String::new();
@@ -1650,6 +1690,7 @@ impl SpacebotModel {
                     }
                 };
 
+                record_streaming_usage(&stream_accumulator, &response_body, &stream_model_name, &stream_provider).await;
                 yield Ok(RawStreamingChoice::FinalResponse(RawStreamingResponse {
                     body: response_body,
                     usage: Some(parsed_response.usage),
@@ -1683,6 +1724,7 @@ impl SpacebotModel {
                 yield Ok(RawStreamingChoice::MessageId(message_id));
             }
 
+            record_streaming_usage(&stream_accumulator, &response_body, &stream_model_name, &stream_provider).await;
             yield Ok(RawStreamingChoice::FinalResponse(RawStreamingResponse {
                 body: response_body,
                 usage: Some(parsed_response.usage),
@@ -1693,6 +1735,24 @@ impl SpacebotModel {
     }
 }
 // --- Helpers ---
+
+/// Record usage from a streaming response's raw body into the accumulator.
+async fn record_streaming_usage(
+    accumulator: &Option<Arc<Mutex<crate::llm::usage::UsageAccumulator>>>,
+    body: &serde_json::Value,
+    model_name: &str,
+    provider: &str,
+) {
+    if let Some(acc) = accumulator {
+        let extended = if provider == "anthropic" {
+            crate::llm::usage::ExtendedUsage::from_anthropic_body(body)
+        } else {
+            crate::llm::usage::ExtendedUsage::from_openai_body(body)
+        };
+        let cost = crate::llm::pricing::estimate_cost_extended(model_name, &extended);
+        acc.lock().await.add(extended, model_name, provider, cost);
+    }
+}
 
 /// Reverse-map Claude Code canonical tool names back to the original names
 /// from the request's tool definitions.

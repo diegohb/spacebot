@@ -508,6 +508,7 @@ pub(super) async fn trigger_warmup(
                 ),
                 injection_tx,
                 working_memory,
+                api_state: None,
             };
             let mut logger = CortexLogger::new(sqlite_pool);
             if let Some(store) = notif_store_warmup {
@@ -936,6 +937,7 @@ pub async fn create_agent_internal(
                 .unwrap_or(chrono_tz::Tz::UTC);
             crate::memory::WorkingMemoryStore::new(db.sqlite.clone(), tz)
         },
+        api_state: Some(state.clone()),
     };
 
     let event_rx = event_tx.subscribe();

@@ -1,7 +1,18 @@
-import { CheckCircle, WarningCircle, XCircle, ArrowRight } from "@phosphor-icons/react";
-import { Card, CardHeader, CardContent, Badge, Button } from "@spacedrive/primitives";
-import { useNotifications } from "@/hooks/useNotifications";
-import type { NotificationKind } from "@/api/client";
+import {
+	CheckCircle,
+	WarningCircle,
+	XCircle,
+	ArrowRight,
+} from "@phosphor-icons/react";
+import {
+	Card,
+	CardHeader,
+	CardContent,
+	Badge,
+	Button,
+} from "@spacedrive/primitives";
+import {useNotifications} from "@/hooks/useNotifications";
+import type {NotificationKind} from "@/api/client";
 
 const TYPE_CONFIG: Record<
 	NotificationKind,
@@ -47,7 +58,7 @@ function timeAgo(isoString: string): string {
 }
 
 export function ActionItemsCard() {
-	const { notifications, dismiss } = useNotifications("unread");
+	const {notifications, dismiss} = useNotifications("unread");
 
 	return (
 		<Card variant="dark" className="flex h-full flex-col">
@@ -66,15 +77,15 @@ export function ActionItemsCard() {
 				{notifications.length === 0 ? (
 					<div className="flex flex-1 items-center justify-center">
 						<div className="text-center">
-							<CheckCircle className="mx-auto mb-2 h-8 w-8 text-status-success/40" />
+							<CheckCircle className="mx-auto mb-2 h-8 w-8 text-ink-faint" />
 							<p className="text-sm text-ink-faint">All caught up</p>
 						</div>
 					</div>
 				) : (
 					notifications.map((item) => {
-						const kind = (item.kind in TYPE_CONFIG
-							? item.kind
-							: "cortex_observation") as NotificationKind;
+						const kind = (
+							item.kind in TYPE_CONFIG ? item.kind : "cortex_observation"
+						) as NotificationKind;
 						const config = TYPE_CONFIG[kind];
 						const Icon = config.icon;
 						return (
@@ -82,7 +93,9 @@ export function ActionItemsCard() {
 								key={item.id}
 								className="flex items-start gap-3 rounded-lg border border-app-line/50 bg-app-hover/20 px-3 py-2.5 transition-colors hover:bg-app-hover/40"
 							>
-								<Icon className={`mt-0.5 h-4 w-4 shrink-0 ${config.iconClass}`} />
+								<Icon
+									className={`mt-0.5 h-4 w-4 shrink-0 ${config.iconClass}`}
+								/>
 								<div className="min-w-0 flex-1">
 									<p className="truncate text-sm text-ink">{item.title}</p>
 									<div className="mt-1 flex items-center gap-2">
@@ -90,7 +103,9 @@ export function ActionItemsCard() {
 											{config.label}
 										</Badge>
 										{item.agent_id && (
-											<span className="text-tiny text-ink-faint">{item.agent_id}</span>
+											<span className="text-tiny text-ink-faint">
+												{item.agent_id}
+											</span>
 										)}
 										{item.agent_id && (
 											<span className="text-tiny text-ink-faint/50">·</span>

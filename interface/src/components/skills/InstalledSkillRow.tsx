@@ -8,7 +8,11 @@ interface InstalledSkillRowProps {
 	onClick: () => void;
 }
 
-export function InstalledSkillRow({skill, isSelected, onClick}: InstalledSkillRowProps) {
+export function InstalledSkillRow({
+	skill,
+	isSelected,
+	onClick,
+}: InstalledSkillRowProps) {
 	return (
 		<button
 			onClick={onClick}
@@ -22,15 +26,17 @@ export function InstalledSkillRow({skill, isSelected, onClick}: InstalledSkillRo
 			<div className="flex items-center gap-1.5 min-w-0">
 				<span className="truncate text-sm font-medium">{skill.name}</span>
 				<Badge
-					variant={skill.source === "instance" ? "default" : "success"}
+					// variant={skill.source === "instance" ? "default" : "success"}
 					size="sm"
-					className="shrink-0"
+					// className="shrink-0"
 				>
 					{skill.source}
 				</Badge>
 			</div>
 			{skill.description && (
-				<span className="truncate text-xs text-ink-faint">{skill.description}</span>
+				<span className="truncate text-xs text-ink-faint">
+					{skill.description}
+				</span>
 			)}
 		</button>
 	);

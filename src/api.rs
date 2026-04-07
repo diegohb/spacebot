@@ -32,6 +32,7 @@ mod state;
 mod system;
 mod tasks;
 mod tools;
+mod usage;
 mod workers;
 
 pub use server::{api_router, start_http_server};

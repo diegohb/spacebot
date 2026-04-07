@@ -1384,7 +1384,7 @@ async fn run_cron_job(
         ));
     }
 
-    let timeout = Duration::from_secs(job.timeout_secs.unwrap_or(120));
+    let timeout = Duration::from_secs(job.timeout_secs.unwrap_or(1500));
 
     // Keep channel_tx alive — on timeout we send a "synthesize now" message
     // so the LLM gets a direct turn to compose the final reply.

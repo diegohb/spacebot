@@ -1,5 +1,6 @@
 //! Task creation tool for branch processes.
 
+use crate::notifications::{NewNotification, NotificationKind, NotificationSeverity};
 use crate::tasks::{CreateTaskInput, TaskPriority, TaskStatus, TaskStore, TaskSubtask};
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
@@ -7,12 +8,22 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct TaskCreateTool {
     task_store: Arc<TaskStore>,
     agent_id: String,
     created_by: String,
     working_memory: Option<Arc<crate::memory::WorkingMemoryStore>>,
+    api_state: Option<Arc<crate::api::ApiState>>,
+}
+
+impl std::fmt::Debug for TaskCreateTool {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TaskCreateTool")
+            .field("agent_id", &self.agent_id)
+            .field("created_by", &self.created_by)
+            .finish()
+    }
 }
 
 impl TaskCreateTool {
@@ -26,11 +37,17 @@ impl TaskCreateTool {
             agent_id: agent_id.into(),
             created_by: created_by.into(),
             working_memory: None,
+            api_state: None,
         }
     }
 
     pub fn with_working_memory(mut self, store: Arc<crate::memory::WorkingMemoryStore>) -> Self {
         self.working_memory = Some(store);
+        self
+    }
+
+    pub fn with_api_state(mut self, state: Arc<crate::api::ApiState>) -> Self {
+        self.api_state = Some(state);
         self
     }
 }
@@ -129,6 +146,32 @@ impl Tool for TaskCreateTool {
             })
             .await
             .map_err(|error| TaskCreateError(format!("{error}")))?;
+
+        // Emit SSE event + notification so the dashboard updates in real time.
+        if let Some(api_state) = &self.api_state {
+            api_state
+                .event_tx
+                .send(crate::api::ApiEvent::TaskUpdated {
+                    agent_id: task.assigned_agent_id.clone(),
+                    task_number: task.task_number,
+                    status: task.status.to_string(),
+                    action: "created".to_string(),
+                })
+                .ok();
+            if task.status == TaskStatus::PendingApproval {
+                api_state.emit_notification(NewNotification {
+                    kind: NotificationKind::TaskApproval,
+                    severity: NotificationSeverity::Info,
+                    title: format!("Approval needed: {}", task.title),
+                    body: task.description.clone(),
+                    agent_id: Some(task.assigned_agent_id.clone()),
+                    related_entity_type: Some("task".to_string()),
+                    related_entity_id: Some(task.task_number.to_string()),
+                    action_url: Some(format!("/tasks/{}", task.task_number)),
+                    metadata: None,
+                });
+            }
+        }
 
         if let Some(working_memory) = &self.working_memory {
             working_memory

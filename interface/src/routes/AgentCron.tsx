@@ -627,7 +627,7 @@ export function AgentCron({agentId}: AgentCronProps) {
 									className="w-32"
 								/>
 								<p className="mt-1 text-tiny text-ink-faint">
-									Max seconds per run (default 120)
+									Max seconds per run (default 1500)
 								</p>
 							</Field>
 

@@ -290,6 +290,7 @@ async fn spawn_branch(
         state.channel_store.clone(),
         crate::conversation::ProcessRunLogger::new(state.deps.sqlite_pool.clone()),
         profile,
+        state.deps.api_state.clone(),
     );
     let branch_max_turns = **state.deps.runtime_config.branch_max_turns.load();
 

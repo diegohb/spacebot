@@ -2995,6 +2995,7 @@ async fn initialize_agents(
             ),
             injection_tx: injection_tx.clone(),
             working_memory,
+            api_state: Some(api_state.clone()),
         };
 
         let agent = spacebot::Agent {

@@ -1,16 +1,12 @@
 import {useState, useMemo} from "react";
 import {useQuery} from "@tanstack/react-query";
 import {useQueries} from "@tanstack/react-query";
-import {Queue, MagnifyingGlass} from "@phosphor-icons/react";
+import {Queue, MagnifyingGlass, CaretLeft} from "@phosphor-icons/react";
 import {
 	CircleButton,
 	PopoverRoot,
 	PopoverTrigger,
 	PopoverContent,
-	DialogRoot,
-	DialogContent,
-	DialogTitle,
-	FilterButton,
 } from "@spacedrive/primitives";
 import {
 	api,
@@ -148,8 +144,12 @@ export function WorkersPanelContent() {
 	);
 
 	return (
-		<>
-			<div className="flex flex-col" style={{height: 500}}>
+		<div className="relative overflow-hidden" style={{height: 500}}>
+			{/* List view */}
+			<div
+				className="absolute inset-0 flex flex-col transition-transform duration-250 ease-in-out"
+				style={{transform: selectedWorker ? "translateX(-100%)" : "translateX(0)"}}
+			>
 				{/* Search */}
 				<div className="flex items-center gap-2 border-b border-app-line px-3 py-2.5">
 					<MagnifyingGlass className="h-3.5 w-3.5 shrink-0 text-ink-faint" />
@@ -239,29 +239,23 @@ export function WorkersPanelContent() {
 				</div>
 			</div>
 
-			{/* Worker detail modal */}
-			<DialogRoot
-				open={!!selectedWorker}
-				onOpenChange={(open) => {
-					if (!open) setSelectedWorker(null);
-				}}
+			{/* Detail view — slides in from the right */}
+			<div
+				className="absolute inset-0 flex flex-col transition-transform duration-250 ease-in-out"
+				style={{transform: selectedWorker ? "translateX(0)" : "translateX(100%)"}}
 			>
-				<DialogContent className="max-h-[85vh] w-[800px] max-w-[90vw] overflow-hidden p-0">
-					<DialogTitle className="sr-only">Worker Detail</DialogTitle>
-					{selectedWorker && (
-						<WorkerModalContent
-							workerId={selectedWorker.workerId}
-							agentId={selectedWorker.agentId}
-							liveWorker={
-								activeWorkers[selectedWorker.workerId] as LiveWorker | undefined
-							}
-							liveTranscript={liveTranscripts[selectedWorker.workerId]}
-							liveOpenCodeParts={liveOpenCodeParts[selectedWorker.workerId]}
-						/>
-					)}
-				</DialogContent>
-			</DialogRoot>
-		</>
+				{selectedWorker && (
+					<WorkerDetailInline
+						workerId={selectedWorker.workerId}
+						agentId={selectedWorker.agentId}
+						liveWorker={activeWorkers[selectedWorker.workerId] as LiveWorker | undefined}
+						liveTranscript={liveTranscripts[selectedWorker.workerId]}
+						liveOpenCodeParts={liveOpenCodeParts[selectedWorker.workerId]}
+						onBack={() => setSelectedWorker(null)}
+					/>
+				)}
+			</div>
+		</div>
 	);
 }
 
@@ -336,20 +330,22 @@ function WorkerPanelRow({
 	);
 }
 
-// ─── Modal content (fetches detail + renders WorkerDetail) ──────────────────
+// ─── Inline detail view (slides in within the popover) ────────────────────
 
-function WorkerModalContent({
+function WorkerDetailInline({
 	workerId,
 	agentId,
 	liveWorker,
 	liveTranscript,
 	liveOpenCodeParts,
+	onBack,
 }: {
 	workerId: string;
 	agentId: string;
 	liveWorker?: LiveWorker;
 	liveTranscript?: TranscriptStep[];
 	liveOpenCodeParts?: Map<string, OpenCodePart>;
+	onBack: () => void;
 }) {
 	const {data: detailData} = useQuery({
 		queryKey: ["worker-detail", agentId, workerId],
@@ -381,22 +377,31 @@ function WorkerModalContent({
 		};
 	}, [detailData, liveWorker]);
 
-	if (!detail) {
-		return (
-			<div className="flex h-64 items-center justify-center">
-				<p className="text-sm text-ink-faint">Loading...</p>
-			</div>
-		);
-	}
-
 	return (
-		<div className="flex h-full max-h-[85vh] flex-col overflow-hidden">
-			<WorkerDetail
-				detail={detail}
-				liveWorker={liveWorker}
-				liveTranscript={liveTranscript}
-				liveOpenCodeParts={liveOpenCodeParts}
-			/>
-		</div>
+		<>
+			{/* Back bar */}
+			<button
+				onClick={onBack}
+				className="flex items-center gap-1.5 border-b border-app-line px-3 py-2 text-xs font-medium text-ink-dull transition-colors hover:text-ink"
+			>
+				<CaretLeft className="h-3.5 w-3.5" />
+				Workers
+			</button>
+
+			{!detail ? (
+				<div className="flex flex-1 items-center justify-center">
+					<p className="text-sm text-ink-faint">Loading...</p>
+				</div>
+			) : (
+				<div className="flex-1 overflow-hidden">
+					<WorkerDetail
+						detail={detail}
+						liveWorker={liveWorker}
+						liveTranscript={liveTranscript}
+						liveOpenCodeParts={liveOpenCodeParts}
+					/>
+				</div>
+			)}
+		</>
 	);
 }

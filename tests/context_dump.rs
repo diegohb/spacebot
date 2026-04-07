@@ -130,6 +130,7 @@ async fn bootstrap_deps() -> anyhow::Result<(spacebot::AgentDeps, spacebot::conf
             db.sqlite.clone(),
             chrono_tz::Tz::UTC,
         ),
+        api_state: None,
     };
 
     Ok((deps, config))
@@ -336,6 +337,7 @@ async fn dump_branch_context() {
         channel_store,
         run_logger,
         spacebot::tools::BranchToolProfile::Default,
+        None,
     );
 
     let tool_defs = branch_tool_server
@@ -552,6 +554,7 @@ async fn dump_all_contexts() {
         channel_store,
         run_logger,
         spacebot::tools::BranchToolProfile::Default,
+        None,
     );
     let branch_tool_defs = branch_tool_server.get_tool_defs(None).await.unwrap();
     let branch_tools_text = format_tool_defs(&branch_tool_defs);

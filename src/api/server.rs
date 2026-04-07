@@ -4,7 +4,7 @@ use super::state::ApiState;
 use super::{
     agents, attachments, bindings, channels, config, cortex, cron, factory, ingest, links, mcp,
     memories, messaging, models, notifications, opencode_proxy, portal, projects, providers,
-    secrets, settings, skills, ssh, system, tasks, tools, workers,
+    secrets, settings, skills, ssh, system, tasks, tools, usage, workers,
 };
 
 use axum::Json;
@@ -248,6 +248,9 @@ pub fn api_router() -> OpenApiRouter<Arc<ApiState>> {
         .routes(routes!(links::update_group, links::delete_group))
         .routes(routes!(links::list_humans, links::create_human))
         .routes(routes!(links::update_human, links::delete_human))
+        // Usage routes
+        .routes(routes!(usage::get_usage))
+        .routes(routes!(usage::get_conversation_usage))
         // Factory routes
         .routes(routes!(factory::list_presets))
         .routes(routes!(factory::get_preset))

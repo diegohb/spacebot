@@ -350,10 +350,14 @@ impl Worker {
             .as_deref()
             .unwrap_or_else(|| routing.resolve(ProcessType::Worker, None))
             .to_string();
+        let usage_accumulator = std::sync::Arc::new(
+            tokio::sync::Mutex::new(crate::llm::usage::UsageAccumulator::new()),
+        );
         let model = SpacebotModel::make(&self.deps.llm_manager, &model_name)
             .with_context(&*self.deps.agent_id, "worker")
             .with_worker_type("builtin")
-            .with_routing((**routing).clone());
+            .with_routing((**routing).clone())
+            .with_accumulator(usage_accumulator.clone());
 
         let agent = AgentBuilder::new(model)
             .preamble(&self.system_prompt)
@@ -718,6 +722,20 @@ impl Worker {
 
         // Persist transcript blob
         self.persist_transcript(&compacted_history, &history).await;
+
+        // Flush accumulated token usage.
+        let acc = usage_accumulator.lock().await;
+        if let Err(error) = acc
+            .flush(
+                &self.deps.sqlite_pool,
+                &self.deps.agent_id,
+                "worker",
+                self.channel_id.as_deref(),
+            )
+            .await
+        {
+            tracing::warn!(%error, "failed to flush worker token usage");
+        }
 
         tracing::info!(worker_id = %self.id, "worker completed");
         Ok(result)

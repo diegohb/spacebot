@@ -1199,19 +1199,24 @@ impl Cortex {
             }
         }
 
-        logger.log(
-            "health_check",
-            "Cortex supervision health tick completed",
-            Some(serde_json::json!({
-                "kill_skipped_due_to_lag": false,
-                "kill_budget": kill_budget,
-                "kill_attempts": kill_attempts,
-                "kill_actions": kill_actions,
-                "worker_timeout_secs": worker_timeout.as_secs(),
-                "branch_timeout_secs": branch_timeout.as_secs(),
-                "pruned_dead_channels": pruned_dead_channels,
-            })),
-        );
+        // Only log health ticks when something actually happened.
+        if kill_actions > 0 || pruned_dead_channels > 0 {
+            logger.log(
+                "health_check",
+                &format!(
+                    "Cortex supervision: killed {} processes, pruned {} dead channels",
+                    kill_actions, pruned_dead_channels
+                ),
+                Some(serde_json::json!({
+                    "kill_budget": kill_budget,
+                    "kill_attempts": kill_attempts,
+                    "kill_actions": kill_actions,
+                    "worker_timeout_secs": worker_timeout.as_secs(),
+                    "branch_timeout_secs": branch_timeout.as_secs(),
+                    "pruned_dead_channels": pruned_dead_channels,
+                })),
+            );
+        }
 
         Ok(())
     }
@@ -2477,9 +2482,13 @@ pub async fn generate_bulletin(deps: &AgentDeps, logger: &CortexLogger) -> bool 
 
     let routing = deps.runtime_config.routing.load();
     let model_name = routing.resolve(ProcessType::Cortex, None).to_string();
+    let usage_accumulator = std::sync::Arc::new(
+        tokio::sync::Mutex::new(crate::llm::usage::UsageAccumulator::new()),
+    );
     let model = SpacebotModel::make(&deps.llm_manager, &model_name)
         .with_context(&*deps.agent_id, "cortex")
-        .with_routing((**routing).clone());
+        .with_routing((**routing).clone())
+        .with_accumulator(usage_accumulator.clone());
 
     // No tools needed — the LLM just synthesizes the pre-gathered data.
     // Attach CortexHook so observation/termination semantics stay consistent
@@ -2499,7 +2508,15 @@ pub async fn generate_bulletin(deps: &AgentDeps, logger: &CortexLogger) -> bool 
         }
     };
 
-    match agent.prompt(&synthesis_prompt).await {
+    let result = agent.prompt(&synthesis_prompt).await;
+    // Flush cortex token usage.
+    let acc = usage_accumulator.lock().await;
+    if let Err(error) = acc.flush(&deps.sqlite_pool, &deps.agent_id, "cortex", None).await {
+        tracing::warn!(%error, "failed to flush cortex token usage");
+    }
+    drop(acc);
+
+    match result {
         Ok(bulletin) => {
             let word_count = bulletin.split_whitespace().count();
             let duration_ms = started.elapsed().as_millis() as u64;
@@ -2643,9 +2660,13 @@ pub async fn generate_knowledge_synthesis(deps: &AgentDeps, logger: &CortexLogge
 
     let routing = deps.runtime_config.routing.load();
     let model_name = routing.resolve(ProcessType::Cortex, None).to_string();
+    let usage_accumulator = std::sync::Arc::new(
+        tokio::sync::Mutex::new(crate::llm::usage::UsageAccumulator::new()),
+    );
     let model = SpacebotModel::make(&deps.llm_manager, &model_name)
         .with_context(&*deps.agent_id, "cortex")
-        .with_routing((**routing).clone());
+        .with_routing((**routing).clone())
+        .with_accumulator(usage_accumulator.clone());
 
     let agent = AgentBuilder::new(model)
         .preamble(&synthesis_preamble)
@@ -2661,7 +2682,14 @@ pub async fn generate_knowledge_synthesis(deps: &AgentDeps, logger: &CortexLogge
         }
     };
 
-    match agent.prompt(&user_prompt).await {
+    let result = agent.prompt(&user_prompt).await;
+    let acc = usage_accumulator.lock().await;
+    if let Err(error) = acc.flush(&deps.sqlite_pool, &deps.agent_id, "cortex", None).await {
+        tracing::warn!(%error, "failed to flush cortex token usage");
+    }
+    drop(acc);
+
+    match result {
         Ok(synthesis) => {
             let word_count = synthesis.split_whitespace().count();
             let duration_ms = started.elapsed().as_millis() as u64;
@@ -2893,16 +2921,26 @@ pub async fn maybe_synthesize_intraday_batch(
     // Use a short one-shot LLM call — no tools, no hooks.
     let routing = deps.runtime_config.routing.load();
     let model_name = routing.resolve(ProcessType::Cortex, None).to_string();
+    let usage_accumulator = std::sync::Arc::new(
+        tokio::sync::Mutex::new(crate::llm::usage::UsageAccumulator::new()),
+    );
     let model = SpacebotModel::make(&deps.llm_manager, &model_name)
         .with_context(&*deps.agent_id, "cortex")
-        .with_routing((**routing).clone());
+        .with_routing((**routing).clone())
+        .with_accumulator(usage_accumulator.clone());
 
     let agent = AgentBuilder::new(model)
         .preamble("You are a concise narrative summarizer. Output only the summary paragraph, nothing else.")
         .hook(CortexHook::new())
         .build();
 
-    let synthesis = agent.prompt(&prompt).await?;
+    let synthesis = agent.prompt(&prompt).await;
+    let acc = usage_accumulator.lock().await;
+    if let Err(e) = acc.flush(&deps.sqlite_pool, &deps.agent_id, "cortex", None).await {
+        tracing::warn!(error = %e, "failed to flush cortex token usage");
+    }
+    drop(acc);
+    let synthesis = synthesis?;
 
     // Store the synthesis.
     wm.save_intraday_synthesis(
@@ -3035,16 +3073,26 @@ pub async fn maybe_synthesize_daily_summary(
     // One-shot LLM call.
     let routing = deps.runtime_config.routing.load();
     let model_name = routing.resolve(ProcessType::Cortex, None).to_string();
+    let usage_accumulator = std::sync::Arc::new(
+        tokio::sync::Mutex::new(crate::llm::usage::UsageAccumulator::new()),
+    );
     let model = SpacebotModel::make(&deps.llm_manager, &model_name)
         .with_context(&*deps.agent_id, "cortex")
-        .with_routing((**routing).clone());
+        .with_routing((**routing).clone())
+        .with_accumulator(usage_accumulator.clone());
 
     let agent = AgentBuilder::new(model)
         .preamble("You are a daily activity summarizer. Output only the summary, nothing else.")
         .hook(CortexHook::new())
         .build();
 
-    let summary = agent.prompt(&prompt).await?;
+    let summary = agent.prompt(&prompt).await;
+    let acc = usage_accumulator.lock().await;
+    if let Err(e) = acc.flush(&deps.sqlite_pool, &deps.agent_id, "cortex", None).await {
+        tracing::warn!(error = %e, "failed to flush cortex token usage");
+    }
+    drop(acc);
+    let summary = summary?;
 
     wm.save_daily_summary(&yesterday, &summary, total_events)
         .await?;
@@ -3186,19 +3234,29 @@ async fn generate_profile(deps: &AgentDeps, logger: &CortexLogger) {
 
     let routing = deps.runtime_config.routing.load();
     let model_name = routing.resolve(ProcessType::Cortex, None).to_string();
+    let usage_accumulator = std::sync::Arc::new(
+        tokio::sync::Mutex::new(crate::llm::usage::UsageAccumulator::new()),
+    );
     let model = SpacebotModel::make(&deps.llm_manager, &model_name)
         .with_context(&*deps.agent_id, "cortex")
-        .with_routing((**routing).clone());
+        .with_routing((**routing).clone())
+        .with_accumulator(usage_accumulator.clone());
 
     let agent = AgentBuilder::new(model)
         .preamble(&profile_prompt)
         .hook(CortexHook::new())
         .build();
 
-    match agent
+    let result = agent
         .prompt_typed::<ProfileLlmResponse>(&synthesis_prompt)
-        .await
-    {
+        .await;
+    let acc = usage_accumulator.lock().await;
+    if let Err(e) = acc.flush(&deps.sqlite_pool, &deps.agent_id, "cortex", None).await {
+        tracing::warn!(error = %e, "failed to flush cortex token usage");
+    }
+    drop(acc);
+
+    match result {
         Ok(profile_data) => {
             let duration_ms = started.elapsed().as_millis() as u64;
             let agent_id = &deps.agent_id;

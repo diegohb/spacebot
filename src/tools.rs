@@ -594,6 +594,7 @@ pub fn create_branch_tool_server(
     channel_store: crate::conversation::ChannelStore,
     run_logger: crate::conversation::history::ProcessRunLogger,
     profile: BranchToolProfile,
+    api_state: Option<Arc<crate::api::ApiState>>,
 ) -> ToolServerHandle {
     let mut memory_save = memory_save_with_events(
         memory_search.clone(),
@@ -605,6 +606,15 @@ pub fn create_branch_tool_server(
         memory_save = memory_save.with_contract_state(contract_state.clone());
     }
 
+    let mut task_create = TaskCreateTool::new(
+        task_store.clone(),
+        agent_id.to_string(),
+        "branch",
+    );
+    if let Some(ref api) = api_state {
+        task_create = task_create.with_api_state(api.clone());
+    }
+
     let mut server = ToolServer::new()
         .tool(memory_save)
         .tool(MemoryRecallTool::new(memory_search.clone()))
@@ -613,11 +623,7 @@ pub fn create_branch_tool_server(
         .tool(SpacebotDocsTool::new())
         .tool(EmailSearchTool::new(runtime_config))
         .tool(WorkerInspectTool::new(run_logger, agent_id.to_string()))
-        .tool(TaskCreateTool::new(
-            task_store.clone(),
-            agent_id.to_string(),
-            "branch",
-        ))
+        .tool(task_create)
         .tool(TaskListTool::new(task_store.clone(), agent_id.to_string()))
         .tool(TaskUpdateTool::for_branch(task_store, agent_id.clone()));
 
@@ -791,14 +797,14 @@ pub fn create_cortex_chat_tool_server(
             runtime_config.clone(),
         ))
         .tool(SkillsSearchTool::new(runtime_config.clone()))
-        .tool(InstallSkillTool::new(runtime_config.clone(), api_state))
+        .tool(InstallSkillTool::new(runtime_config.clone(), api_state.clone()))
         .tool(WorkerInspectTool::new(run_logger, agent_id.to_string()))
         .tool(spawn_tool)
         .tool(TaskCreateTool::new(
             task_store.clone(),
             agent_id.to_string(),
             "cortex",
-        ))
+        ).with_api_state(api_state))
         .tool(TaskListTool::new(task_store.clone(), agent_id.to_string()))
         .tool(TaskUpdateTool::for_branch(task_store, agent_id.clone()))
         .tool(ShellTool::new(workspace.clone(), sandbox.clone()));

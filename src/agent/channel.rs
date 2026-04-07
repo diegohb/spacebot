@@ -2598,9 +2598,13 @@ impl Channel {
                 routing.resolve(ProcessType::Channel, None)
             };
 
+        let usage_accumulator = std::sync::Arc::new(
+            tokio::sync::Mutex::new(crate::llm::usage::UsageAccumulator::new()),
+        );
         let model = SpacebotModel::make(&self.deps.llm_manager, model_name)
             .with_context(&*self.deps.agent_id, "channel")
-            .with_routing((**routing).clone());
+            .with_routing((**routing).clone())
+            .with_accumulator(usage_accumulator.clone());
 
         let agent = AgentBuilder::new(model)
             .preamble(system_prompt)
@@ -2705,6 +2709,20 @@ impl Channel {
             crate::tools::remove_channel_tools(&self.tool_server, allow_direct_reply).await
         {
             tracing::warn!(%error, "failed to remove channel tools");
+        }
+
+        // Flush accumulated token usage to the database.
+        let acc = usage_accumulator.lock().await;
+        if let Err(error) = acc
+            .flush(
+                &self.deps.sqlite_pool,
+                &self.deps.agent_id,
+                "channel",
+                Some(conversation_id),
+            )
+            .await
+        {
+            tracing::warn!(%error, "failed to flush token usage");
         }
 
         Ok((result, skip_flag, replied_flag, retrigger_reply_preserved))

@@ -158,7 +158,7 @@ export function AgentMemories({agentId}: AgentMemoriesProps) {
 				<SearchBar
 					placeholder="Search memories..."
 					value={searchQuery}
-					onChange={(event) => setSearchQuery(event.target.value)}
+					onChange={setSearchQuery}
 					className="flex-1"
 				/>
 

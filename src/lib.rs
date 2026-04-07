@@ -420,6 +420,8 @@ pub struct AgentDeps {
     pub injection_tx: tokio::sync::mpsc::Sender<ChannelInjection>,
     /// Working memory event log for temporal situational awareness.
     pub working_memory: Arc<memory::WorkingMemoryStore>,
+    /// Optional API state for tools that need to emit notifications/SSE events.
+    pub api_state: Option<Arc<api::ApiState>>,
 }
 
 impl AgentDeps {
