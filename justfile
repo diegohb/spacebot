@@ -35,7 +35,7 @@ spaceui-link:
         exit 1
     fi
     cd ../spaceui
-    bun install && bun run build
+    bun install && bun run build --filter='@spacedrive/primitives' --filter='@spacedrive/ai' --filter='@spacedrive/forms' --filter='@spacedrive/explorer' --filter='@spacedrive/tokens'
     for pkg in primitives ai forms explorer tokens; do
         cd packages/$pkg && bun link && cd ../..
     done
