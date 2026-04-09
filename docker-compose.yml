@@ -36,18 +36,23 @@ volumes:
 
 # How to extend without merge conflicts:
 
-# Your Dockerfile.custom uses FROM ghcr.io/spacedriveapp/spacebot:latest to inherit everything from upstream
-# Add custom RUN commands in your local file only
-# When upstream updates, you just rebuild: docker-compose build
-# Your customizations stay separate from the upstream repo
-# Workflow:
+# Default mode uses upstream/remote app image as the base:
+# Dockerfile.custom starts from ghcr.io/spacedriveapp/spacebot:latest,
+# then adds your fork-local custom layers.
 
-# # Build your custom image
-# docker compose build
-
-# # Start the container
+# Default workflow (remote base)
+# docker compose build --pull spacebot
 # docker compose up -d
 
-# # Update to latest upstream and rebuild
-# docker compose pull && docker compose build && docker compose up -d
-# This way you maintain your own Dockerfile.custom and docker-compose.yml locally (can add to your own .gitignore), while pulling the base image from upstream whenever needed.
+# Refresh to newest upstream base and recreate container
+# docker pull ghcr.io/spacedriveapp/spacebot:latest
+# docker compose build --pull spacebot
+# docker compose up -d --force-recreate
+
+# Build from LOCAL source code instead (one-off override)
+# docker build -f Dockerfile -t spacebot-custom:latest .
+# docker compose up -d --force-recreate
+
+# Notes:
+# - docker compose up -d alone may reuse an existing image.
+# - Use --build (or docker compose build) when you need new code/layers.
