@@ -1,23 +1,21 @@
+name: spacebot-upstream
+
 services:
-  spacebot:
-    build:
-      context: .
-      dockerfile: Dockerfile.custom
-    image: spacebot-custom:latest
-    container_name: deven-spacebot
+  spacebot-upstream:
+    image: ghcr.io/spacedriveapp/spacebot:latest
+    container_name: upstream-spacebot
     restart: unless-stopped
     ports:
-      - "19898:19898"
+      - "29898:19898"
     environment:
       - PATH=/host-bin:/data/tools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       - SPACEBOT_CRON_TIMEZONE=America/New_York
       - EMA_VAULT_ROOT=/mnt/c/dev/projects/pscm-dscloud/EMAKBAI
       - AGENT_BROWSER_ENGINE=lightpanda
     volumes:
-      - spacebot-data:/data
+      - spacebot-data-upstream:/data
       - /var/run/docker.sock:/var/run/docker.sock
       - C:/dev/projects/pscm-dscloud/EMAKBAI:/mnt/c/dev/projects/pscm-dscloud/EMAKBAI
-      # Librarian-Agent identity files from vault
       - C:/dev/projects/pscm-dscloud/EMAKBAI/00_Control_Plane/Prompts/librarian-agent/SOUL.md:/data/agents/librarian-agent/SOUL.md:ro
       - C:/dev/projects/pscm-dscloud/EMAKBAI/00_Control_Plane/Prompts/librarian-agent/IDENTITY.md:/data/agents/librarian-agent/IDENTITY.md:ro
       - C:/dev/projects/pscm-dscloud/EMAKBAI/00_Control_Plane/Prompts/librarian-agent/ROLE.md:/data/agents/librarian-agent/ROLE.md:ro
@@ -29,19 +27,11 @@ services:
       retries: 3
 
 volumes:
-  spacebot-data:
-    external: true
+  spacebot-data-upstream:
 
-# Helper workflow:
-# - deven-spacebot is the custom container on http://localhost:19898
-# - It uses the existing external volume: spacebot-data
-# - Build it from local source:
-#     ./scripts/spacebot-docker.ps1 custom-up
-# - Build it from Dockerfile.custom (remote-base mode):
-#     ./scripts/spacebot-docker.ps1 custom-up -Mode remote-base
-# - Stop it:
-#     ./scripts/spacebot-docker.ps1 custom-down
-# - Run both custom and upstream variants together:
-#     ./scripts/spacebot-docker.ps1 both-up
-# - Show current status:
-#     ./scripts/spacebot-docker.ps1 status
+# Usage notes:
+# - upstream-spacebot runs the vanilla upstream image on http://localhost:29898
+# - It uses a separate named volume so it can run alongside deven-spacebot safely.
+# - Helper usage:
+#     ./scripts/spacebot-docker.ps1 upstream-up
+#     ./scripts/spacebot-docker.ps1 upstream-down

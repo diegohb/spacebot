@@ -1,7 +1,7 @@
-# Custom Spacebot Dockerfile
-# This extends the upstream image without modifying the original Dockerfile
-# Build with: docker-compose build
-# Run with: docker-compose up -d
+# Remote-base Spacebot Dockerfile
+# This extends ghcr.io/spacedriveapp/spacebot:latest without rebuilding the app from local source.
+# Helper usage:
+#   ./scripts/spacebot-docker.ps1 custom-up -Mode remote-base
 
 FROM ghcr.io/spacedriveapp/spacebot:latest
 

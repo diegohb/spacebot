@@ -21,11 +21,12 @@
 @import "@spacedrive/tokens/src/css/themes/nord.css";
 @import "@spacedrive/tokens/src/css/themes/mocha.css";
 
-/* Tell Tailwind to scan SpaceUI component source for classes */
-@source "../../../spaceui/packages/primitives/src";
-@source "../../../spaceui/packages/ai/src";
-@source "../../../spaceui/packages/forms/src";
-@source "../../../spaceui/packages/explorer/src";
+/* Tell Tailwind to scan installed SpaceUI packages for classes.
+	When local packages are bun-linked, these node_modules paths point to the linked package outputs. */
+@source "../node_modules/@spacedrive/primitives/dist";
+@source "../node_modules/@spacedrive/ai/dist";
+@source "../node_modules/@spacedrive/forms/dist";
+@source "../node_modules/@spacedrive/explorer/dist";
 
 /* Override default font to IBM Plex Sans */
 @theme {
