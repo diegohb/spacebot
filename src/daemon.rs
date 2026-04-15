@@ -14,6 +14,7 @@ use tracing_subscriber::fmt::format;
 use tracing_subscriber::layer::SubscriberExt as _;
 use tracing_subscriber::util::SubscriberInitExt as _;
 
+use std::io::{BufRead as _, Write as _};
 use std::path::PathBuf;
 use std::time::Instant;
 

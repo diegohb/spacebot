@@ -90,6 +90,10 @@ pub async fn migrate_legacy_tasks(
         }
     }
 
+    crate::tasks::store::repair_task_number_sequence(global_pool)
+        .await
+        .context("failed to synchronize task number sequence after legacy migration")?;
+
     write_marker(&marker_path)?;
 
     if total_migrated > 0 {
@@ -202,11 +206,18 @@ async fn migrate_agent_tasks(
             .await
             .context("failed to begin migration transaction")?;
 
-        let global_number: i64 =
-            sqlx::query_scalar("SELECT COALESCE(MAX(task_number), 0) + 1 FROM tasks")
-                .fetch_one(&mut *tx)
-                .await
-                .context("failed to allocate global task number")?;
+        let global_number: i64 = sqlx::query_scalar(
+            "UPDATE task_number_seq \
+             SET next_number = MAX(\
+                 next_number, \
+                 COALESCE((SELECT MAX(task_number) + 1 FROM tasks), 1)\
+             ) + 1 \
+             WHERE id = 1 \
+             RETURNING next_number - 1",
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .context("failed to allocate global task number")?;
 
         sqlx::query(
             "INSERT INTO tasks (
