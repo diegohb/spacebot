@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::{Row as _, SqlitePool};
 
+use std::time::Duration;
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskStatus {
@@ -186,6 +188,11 @@ impl TaskStore {
     /// Maximum number of retries when a concurrent create races on the
     /// `task_number` UNIQUE constraint.
     const MAX_CREATE_RETRIES: usize = 3;
+    const CREATE_RETRY_BACKOFF_BASE_MS: u64 = 10;
+
+    fn create_retry_backoff(attempt: usize) -> Duration {
+        Duration::from_millis(Self::CREATE_RETRY_BACKOFF_BASE_MS * (attempt as u64 + 1))
+    }
 
     pub async fn create(&self, input: CreateTaskInput) -> Result<Task> {
         let subtasks_json =
@@ -199,15 +206,7 @@ impl TaskStore {
                 .await
                 .context("failed to open task create transaction")?;
 
-            // Atomically allocate the next task number from the high-water-mark
-            // sequence. This avoids number reuse after hard deletes.
-            let task_number: i64 = sqlx::query_scalar(
-                "UPDATE task_number_seq SET next_number = next_number + 1 \
-                 WHERE id = 1 RETURNING next_number - 1",
-            )
-            .fetch_one(&mut *tx)
-            .await
-            .context("failed to allocate next task number")?;
+            let task_number = allocate_next_task_number(&mut tx).await?;
 
             let task_id = uuid::Uuid::new_v4().to_string();
 
@@ -251,9 +250,27 @@ impl TaskStore {
                 Err(sqlx::Error::Database(ref db_error))
                     if db_error.code().as_deref() == Some("2067") =>
                 {
-                    // UNIQUE constraint violation — another concurrent create won the
-                    // race for this task_number. Roll back and retry.
-                    tracing::debug!(attempt, task_number, "task_number collision, retrying");
+                    let (sequence_next_number, max_task_number) =
+                        read_task_number_debug_state(&self.pool)
+                            .await
+                            .unwrap_or((0, 0));
+
+                    tracing::warn!(
+                        attempt,
+                        task_number,
+                        sequence_next_number,
+                        max_task_number,
+                        "task_number collision during create, repairing sequence and retrying"
+                    );
+
+                    repair_task_number_sequence(&self.pool)
+                        .await
+                        .context("failed to repair task number sequence after collision")?;
+
+                    if attempt + 1 < Self::MAX_CREATE_RETRIES {
+                        tokio::time::sleep(Self::create_retry_backoff(attempt)).await;
+                    }
+
                     // tx is dropped here which rolls back automatically.
                     continue;
                 }
@@ -263,9 +280,16 @@ impl TaskStore {
             }
         }
 
+        let (sequence_next_number, max_task_number) =
+            read_task_number_debug_state(&self.pool)
+                .await
+                .unwrap_or((0, 0));
+
         Err(anyhow::anyhow!(
-            "failed to create task after {} retries due to concurrent task_number collisions",
-            Self::MAX_CREATE_RETRIES
+            "failed to create task after {} retries due to task_number collisions (next_number={}, max_task_number={})",
+            Self::MAX_CREATE_RETRIES,
+            sequence_next_number,
+            max_task_number,
         )
         .into())
     }
@@ -521,6 +545,59 @@ impl TaskStore {
     }
 }
 
+async fn allocate_next_task_number(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+) -> Result<i64> {
+    sqlx::query_scalar(
+        "UPDATE task_number_seq \
+         SET next_number = MAX(\
+             next_number, \
+             COALESCE((SELECT MAX(task_number) + 1 FROM tasks), 1)\
+         ) + 1 \
+         WHERE id = 1 \
+         RETURNING next_number - 1",
+    )
+    .fetch_one(&mut **tx)
+    .await
+    .context("failed to allocate next task number")
+    .map_err(Into::into)
+}
+
+pub async fn repair_task_number_sequence(pool: &SqlitePool) -> Result<i64> {
+    sqlx::query_scalar(
+        "UPDATE task_number_seq \
+         SET next_number = MAX(\
+             next_number, \
+             COALESCE((SELECT MAX(task_number) + 1 FROM tasks), 1)\
+         ) \
+         WHERE id = 1 \
+         RETURNING next_number",
+    )
+    .fetch_one(pool)
+    .await
+    .context("failed to repair task number sequence")
+    .map_err(Into::into)
+}
+
+async fn read_task_number_debug_state(pool: &SqlitePool) -> Result<(i64, i64)> {
+    let row = sqlx::query(
+        "SELECT next_number, COALESCE((SELECT MAX(task_number) FROM tasks), 0) AS max_task_number \
+         FROM task_number_seq WHERE id = 1",
+    )
+    .fetch_one(pool)
+    .await
+    .context("failed to read task number sequence state")?;
+
+    let sequence_next_number = row
+        .try_get("next_number")
+        .context("failed to read next_number")?;
+    let max_task_number = row
+        .try_get("max_task_number")
+        .context("failed to read max_task_number")?;
+
+    Ok((sequence_next_number, max_task_number))
+}
+
 /// Column list used by all SELECT queries. Kept in sync with `task_from_row`.
 const SELECT_COLUMNS: &str = "SELECT id, task_number, title, description, status, priority, \
      owner_agent_id, assigned_agent_id, subtasks, metadata, source_memory_id, worker_id, \
@@ -743,6 +820,48 @@ mod tests {
         }
     }
 
+    async fn insert_task_with_number(store: &TaskStore, task_number: i64, title: &str) {
+        sqlx::query(
+            r#"
+            INSERT INTO tasks (
+                id, task_number, title, description, status, priority,
+                owner_agent_id, assigned_agent_id,
+                subtasks, metadata, source_memory_id, worker_id,
+                created_by, approved_at, approved_by,
+                created_at, updated_at, completed_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(uuid::Uuid::new_v4().to_string())
+        .bind(task_number)
+        .bind(title)
+        .bind(Option::<String>::None)
+        .bind(TaskStatus::Backlog.as_str())
+        .bind(TaskPriority::Medium.as_str())
+        .bind("agent-test")
+        .bind("agent-test")
+        .bind("[]")
+        .bind("{}")
+        .bind(Option::<String>::None)
+        .bind(Option::<String>::None)
+        .bind("migration")
+        .bind(Option::<String>::None)
+        .bind(Option::<String>::None)
+        .bind("2026-01-01T00:00:00Z")
+        .bind("2026-01-01T00:00:00Z")
+        .bind(Option::<String>::None)
+        .execute(&store.pool)
+        .await
+        .expect("task seed should be inserted");
+    }
+
+    async fn read_sequence_next_number(store: &TaskStore) -> i64 {
+        sqlx::query_scalar("SELECT next_number FROM task_number_seq WHERE id = 1")
+            .fetch_one(&store.pool)
+            .await
+            .expect("sequence should exist")
+    }
+
     #[tokio::test]
     async fn rejects_invalid_status_transition() {
         let store = setup_store().await;
@@ -904,6 +1023,44 @@ mod tests {
             .expect("fetch should succeed")
             .expect("task 2 should exist");
         assert_eq!(fetched_b.owner_agent_id, "agent-other");
+    }
+
+    #[tokio::test]
+    async fn repair_task_number_sequence_is_idempotent() {
+        let store = setup_store().await;
+        insert_task_with_number(&store, 5, "seeded task").await;
+
+        let repaired = repair_task_number_sequence(&store.pool)
+            .await
+            .expect("repair should succeed");
+        assert_eq!(repaired, 6);
+        assert_eq!(read_sequence_next_number(&store).await, 6);
+
+        let repaired_again = repair_task_number_sequence(&store.pool)
+            .await
+            .expect("second repair should succeed");
+        assert_eq!(repaired_again, 6);
+        assert_eq!(read_sequence_next_number(&store).await, 6);
+    }
+
+    #[tokio::test]
+    async fn create_repairs_stale_task_number_sequence() {
+        let store = setup_store().await;
+        insert_task_with_number(&store, 4, "seeded task").await;
+
+        let created = store
+            .create(self_assigned_input("new task", TaskStatus::Backlog))
+            .await
+            .expect("create should succeed after repairing a stale sequence");
+
+        assert_eq!(created.task_number, 5);
+        assert_eq!(read_sequence_next_number(&store).await, 6);
+
+        let task_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tasks")
+            .fetch_one(&store.pool)
+            .await
+            .expect("count should succeed");
+        assert_eq!(task_count, 2);
     }
 
     #[tokio::test]

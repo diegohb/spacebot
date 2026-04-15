@@ -5,5 +5,5 @@ pub mod store;
 
 pub use store::{
     CreateTaskInput, Task, TaskListFilter, TaskPriority, TaskStatus, TaskStore, TaskSubtask,
-    UpdateTaskInput,
+    UpdateTaskInput, repair_task_number_sequence,
 };

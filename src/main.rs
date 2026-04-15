@@ -1628,6 +1628,10 @@ async fn run(
         .await
         .context("failed to migrate legacy tasks to global database")?;
 
+    spacebot::tasks::repair_task_number_sequence(&instance_pool)
+        .await
+        .context("failed to repair task number sequence")?;
+
     let global_task_store = Arc::new(spacebot::tasks::TaskStore::new(instance_pool.clone()));
 
     // Instance-wide wiki knowledge base.
