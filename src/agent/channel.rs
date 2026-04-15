@@ -4314,7 +4314,11 @@ mod tests {
             .collect();
 
         // Only the slack channel should pass through.
-        assert_eq!(visible.len(), 1, "only real-platform channels should be visible");
+        assert_eq!(
+            visible.len(),
+            1,
+            "only real-platform channels should be visible"
+        );
         assert_eq!(visible[0].platform, "slack");
     }
 }

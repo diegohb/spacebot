@@ -280,10 +280,9 @@ impl TaskStore {
             }
         }
 
-        let (sequence_next_number, max_task_number) =
-            read_task_number_debug_state(&self.pool)
-                .await
-                .unwrap_or((0, 0));
+        let (sequence_next_number, max_task_number) = read_task_number_debug_state(&self.pool)
+            .await
+            .unwrap_or((0, 0));
 
         Err(anyhow::anyhow!(
             "failed to create task after {} retries due to task_number collisions (next_number={}, max_task_number={})",
@@ -545,9 +544,7 @@ impl TaskStore {
     }
 }
 
-async fn allocate_next_task_number(
-    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
-) -> Result<i64> {
+async fn allocate_next_task_number(tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>) -> Result<i64> {
     sqlx::query_scalar(
         "UPDATE task_number_seq \
          SET next_number = MAX(\
