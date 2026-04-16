@@ -20,7 +20,10 @@ param(
 
     [Parameter()]
     [ValidateSet('local', 'remote-base')]
-    [string]$Mode = 'local'
+    [string]$Mode = 'local',
+
+    [Parameter()]
+    [string]$VaultPath = $(if ($env:EMAKBAI_HOST_PATH) { $env:EMAKBAI_HOST_PATH } else { 'C:/dev/projects/pscm-dscloud/EMAKBAI' })
 )
 
 $ErrorActionPreference = 'Stop'
@@ -99,6 +102,7 @@ function Stop-Upstream {
 
 function Show-Status {
     Write-Host '==> Container status' -ForegroundColor Cyan
+    Write-Host "==> EMAKBAI_HOST_PATH=$env:EMAKBAI_HOST_PATH" -ForegroundColor Cyan
     $containers = & docker ps -a --format "{{.Names}}`t{{.Image}}`t{{.Status}}`t{{.Ports}}"
     $containers | Where-Object { $_ -match '^(deven-spacebot|upstream-spacebot)\s' }
 }
@@ -106,11 +110,11 @@ function Show-Status {
 function Show-Usage {
     @'
 Usage:
-  ./scripts/spacebot-docker.ps1 custom-up [-Mode local|remote-base]
+    ./scripts/spacebot-docker.ps1 custom-up [-Mode local|remote-base] [-VaultPath C:/path]
   ./scripts/spacebot-docker.ps1 custom-down
   ./scripts/spacebot-docker.ps1 upstream-up
   ./scripts/spacebot-docker.ps1 upstream-down
-  ./scripts/spacebot-docker.ps1 both-up [-Mode local|remote-base]
+    ./scripts/spacebot-docker.ps1 both-up [-Mode local|remote-base] [-VaultPath C:/path]
   ./scripts/spacebot-docker.ps1 both-down
   ./scripts/spacebot-docker.ps1 status
 
@@ -121,11 +125,17 @@ Modes:
 Ports:
   deven-spacebot    http://localhost:19898
   upstream-spacebot http://localhost:29898
+
+Host Path:
+    EMAKBAI_HOST_PATH controls host bind mounts for the EMAKBAI vault.
+    Default on PowerShell: C:/dev/projects/pscm-dscloud/EMAKBAI
 '@ | Write-Host
 }
 
 Push-Location $repoRoot
 try {
+        $env:EMAKBAI_HOST_PATH = ($VaultPath -replace '\\', '/')
+
     switch ($Command) {
         'custom-up' { Start-Custom }
         'custom-down' { Stop-Custom }
