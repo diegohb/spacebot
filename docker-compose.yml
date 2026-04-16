@@ -16,12 +16,26 @@ services:
     volumes:
       - spacebot-data:/data
       - /var/run/docker.sock:/var/run/docker.sock
-      - C:/dev/projects/pscm-dscloud/EMAKBAI:/mnt/c/dev/projects/pscm-dscloud/EMAKBAI
+      - type: bind
+        source: ${EMAKBAI_HOST_PATH:-/mnt/c/dev/projects/pscm-dscloud/EMAKBAI}
+        target: /mnt/c/dev/projects/pscm-dscloud/EMAKBAI
       # Librarian-Agent identity files from vault
-      - C:/dev/projects/pscm-dscloud/EMAKBAI/00_Control_Plane/Prompts/librarian-agent/SOUL.md:/data/agents/librarian-agent/SOUL.md:ro
-      - C:/dev/projects/pscm-dscloud/EMAKBAI/00_Control_Plane/Prompts/librarian-agent/IDENTITY.md:/data/agents/librarian-agent/IDENTITY.md:ro
-      - C:/dev/projects/pscm-dscloud/EMAKBAI/00_Control_Plane/Prompts/librarian-agent/ROLE.md:/data/agents/librarian-agent/ROLE.md:ro
-      - C:/dev/projects/pscm-dscloud/EMAKBAI/00_Control_Plane/Prompts/librarian-agent/SKILLS/librarian-heartbeat:/data/agents/librarian-agent/workspace/skills/librarian-heartbeat:ro
+      - type: bind
+        source: ${EMAKBAI_HOST_PATH:-/mnt/c/dev/projects/pscm-dscloud/EMAKBAI}/00_Control_Plane/Prompts/librarian-agent/SOUL.md
+        target: /data/agents/librarian-agent/SOUL.md
+        read_only: true
+      - type: bind
+        source: ${EMAKBAI_HOST_PATH:-/mnt/c/dev/projects/pscm-dscloud/EMAKBAI}/00_Control_Plane/Prompts/librarian-agent/IDENTITY.md
+        target: /data/agents/librarian-agent/IDENTITY.md
+        read_only: true
+      - type: bind
+        source: ${EMAKBAI_HOST_PATH:-/mnt/c/dev/projects/pscm-dscloud/EMAKBAI}/00_Control_Plane/Prompts/librarian-agent/ROLE.md
+        target: /data/agents/librarian-agent/ROLE.md
+        read_only: true
+      - type: bind
+        source: ${EMAKBAI_HOST_PATH:-/mnt/c/dev/projects/pscm-dscloud/EMAKBAI}/00_Control_Plane/Prompts/librarian-agent/SKILLS/librarian-heartbeat
+        target: /data/agents/librarian-agent/workspace/skills/librarian-heartbeat
+        read_only: true
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:19898/api/health"]
       interval: 30s
@@ -35,6 +49,7 @@ volumes:
 # Helper workflow:
 # - deven-spacebot is the custom container on http://localhost:19898
 # - It uses the existing external volume: spacebot-data
+# - Host vault path is controlled by EMAKBAI_HOST_PATH (set by helper scripts).
 # - Build it from local source:
 #     ./scripts/spacebot-docker.ps1 custom-up
 # - Build it from Dockerfile.custom (remote-base mode):

@@ -4,11 +4,11 @@ set -euo pipefail
 usage() {
 	cat <<'EOF'
 Usage:
-  ./scripts/spacebot-docker.sh custom-up [--mode local|remote-base]
+	./scripts/spacebot-docker.sh custom-up [--mode local|remote-base] [--vault-path /path|C:/path]
   ./scripts/spacebot-docker.sh custom-down
   ./scripts/spacebot-docker.sh upstream-up
   ./scripts/spacebot-docker.sh upstream-down
-  ./scripts/spacebot-docker.sh both-up [--mode local|remote-base]
+	./scripts/spacebot-docker.sh both-up [--mode local|remote-base] [--vault-path /path|C:/path]
   ./scripts/spacebot-docker.sh both-down
   ./scripts/spacebot-docker.sh status
 
@@ -19,11 +19,28 @@ Modes:
 Ports:
   deven-spacebot    http://localhost:19898
   upstream-spacebot http://localhost:29898
+
+Host Path:
+  EMAKBAI_HOST_PATH controls host bind mounts for the EMAKBAI vault.
+  Default on Bash/WSL: /mnt/c/dev/projects/pscm-dscloud/EMAKBAI
 EOF
 }
 
 command="help"
 mode="local"
+vault_host_path="${EMAKBAI_HOST_PATH:-/mnt/c/dev/projects/pscm-dscloud/EMAKBAI}"
+
+resolve_vault_host_path() {
+	local input_path="$1"
+
+	# On WSL/Linux shells, normalize Windows drive paths if provided.
+	if [[ "$input_path" =~ ^[A-Za-z]:[\\/] ]] && command -v wslpath >/dev/null 2>&1; then
+		wslpath -u "$input_path"
+		return
+	fi
+
+	echo "$input_path"
+}
 
 if (($# > 0)); then
 	command="$1"
@@ -38,6 +55,14 @@ while (($# > 0)); do
 			exit 2
 		fi
 		mode="$2"
+		shift 2
+		;;
+	--vault-path | -v)
+		if (($# < 2)); then
+			echo "[spacebot-docker] ERROR: missing value for $1" >&2
+			exit 2
+		fi
+		vault_host_path="$2"
 		shift 2
 		;;
 	-h | --help)
@@ -73,6 +98,9 @@ esac
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
+
+vault_host_path="$(resolve_vault_host_path "$vault_host_path")"
+export EMAKBAI_HOST_PATH="$vault_host_path"
 
 docker_command() {
 	local description="$1"
@@ -113,6 +141,7 @@ stop_upstream() {
 
 show_status() {
 	echo "==> Container status"
+	echo "==> EMAKBAI_HOST_PATH=$EMAKBAI_HOST_PATH"
 	docker ps -a --format '{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}' \
 		| grep -E '^(deven-spacebot|upstream-spacebot)[[:space:]]' || true
 }
